@@ -39,12 +39,19 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     // Check if user is already logged in (e.g., from localStorage)
     const checkAuthStatus = () => {
       try {
+        console.log('AuthContext: Checking auth status...');
         const token = localStorage.getItem('authToken');
         const userData = localStorage.getItem('userData');
         
+        console.log('AuthContext: Token exists:', !!token);
+        console.log('AuthContext: UserData exists:', !!userData);
+        
         if (token && userData) {
           const parsedUser = JSON.parse(userData);
+          console.log('AuthContext: Setting user from localStorage:', parsedUser);
           setUser(parsedUser);
+        } else {
+          console.log('AuthContext: No valid auth data found');
         }
       } catch (error) {
         console.error('Error checking auth status:', error);
@@ -61,9 +68,11 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   const login = (userData: User, token: string) => {
     console.log('AuthContext login called with:', { userData, token });
+    console.log('AuthContext: Setting user state and localStorage');
     setUser(userData);
     localStorage.setItem('authToken', token);
     localStorage.setItem('userData', JSON.stringify(userData));
+    console.log('AuthContext: Login completed, user set:', userData);
   };
 
   const logout = () => {

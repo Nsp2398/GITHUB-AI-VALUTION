@@ -1,12 +1,21 @@
 import React, { useState } from 'react';
+import { Link } from 'react-router-dom';
 import { AuthWrapper } from '../components/auth/AuthWrapper';
 import { FileUpload } from '../components/ui/FileUpload';
 import { useAuth } from '../contexts/AuthContext';
+import { 
+  CalculatorIcon, 
+  ChartBarIcon, 
+  CpuChipIcon, 
+  RocketLaunchIcon,
+  SparklesIcon,
+  UserCircleIcon,
+  ArrowTopRightOnSquareIcon
+} from '@heroicons/react/24/outline';
 
 export const Dashboard: React.FC = () => {
-  const { user, logout, login } = useAuth();
+  const { user, logout, login, isLoading } = useAuth();
   const [uploadedFiles, setUploadedFiles] = useState<File[]>([]);
-  const [reportData, setReportData] = useState<any>(null);
   const [isGeneratingReport, setIsGeneratingReport] = useState(false);
 
   const handleFileSelect = (files: File[]) => {
@@ -116,37 +125,118 @@ export const Dashboard: React.FC = () => {
   };
 
   const handleAuthSuccess = (authData: any) => {
-    console.log('Auth success data:', authData);
+    console.log('=== AUTH SUCCESS HANDLER ===');
+    console.log('Auth success data received:', authData);
+    console.log('Has token?', !!authData.token);
+    console.log('Has user?', !!authData.user);
+    console.log('Token value:', authData.token);
+    console.log('User value:', authData.user);
+    
     if (authData.token && authData.user) {
+      console.log('Calling login function with user and token...');
       login(authData.user, authData.token);
+      console.log('Login function called successfully');
     } else {
       console.error('Missing token or user data in auth response:', authData);
+      console.error('authData keys:', Object.keys(authData));
     }
+    console.log('=== END AUTH SUCCESS HANDLER ===');
   };
+
+  // Show loading spinner while checking authentication
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading...</p>
+        </div>
+      </div>
+    );
+  }
 
   if (!user) {
     return <AuthWrapper onAuthSuccess={handleAuthSuccess} />;
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <header className="bg-white shadow">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100">
+      {/* Navigation */}
+      <nav className="bg-white/80 backdrop-blur-xl border-b border-white/20 shadow-lg">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center py-6">
-            <div>
-              <h1 className="text-3xl font-bold text-gray-900">ValuAI Dashboard</h1>
-              <p className="text-gray-600">Welcome, {user.firstName} {user.lastName}</p>
+          <div className="flex justify-between items-center h-16">
+            <div className="flex items-center">
+              <div className="flex-shrink-0 flex items-center">
+                <div className="h-10 w-10 bg-gradient-to-br from-blue-600 to-purple-600 rounded-xl flex items-center justify-center">
+                  <SparklesIcon className="h-6 w-6 text-white" />
+                </div>
+                <span className="ml-3 text-xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+                  ValuAI
+                </span>
+              </div>
             </div>
-            <button
-              onClick={logout}
-              className="bg-red-600 hover:bg-red-700 text-white font-medium py-2 px-4 rounded-md"
-            >
-              Sign Out
-            </button>
+            <div className="flex items-center space-x-4">
+              <div className="flex items-center space-x-3">
+                <UserCircleIcon className="h-8 w-8 text-gray-400" />
+                <div className="hidden md:block">
+                  <p className="text-sm font-medium text-gray-900">
+                    {user.firstName} {user.lastName}
+                  </p>
+                  <p className="text-xs text-gray-500">{user.email}</p>
+                </div>
+              </div>
+              <button
+                onClick={logout}
+                className="inline-flex items-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-lg text-gray-700 bg-white/50 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-all duration-200"
+              >
+                <ArrowTopRightOnSquareIcon className="h-4 w-4 mr-2" />
+                Sign out
+              </button>
+            </div>
           </div>
         </div>
-      </header>
+      </nav>
+
+      {/* Comprehensive Valuation Hero Section */}
+      <div className="bg-gradient-to-r from-blue-600 to-purple-700 text-white">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+          <div className="text-center">
+            <h2 className="text-4xl font-bold mb-4">
+              🏆 Comprehensive UCaaS Valuation
+            </h2>
+            <p className="text-xl mb-8 max-w-3xl mx-auto">
+              Get your business valued using three industry-standard methods with AI-powered recommendations. 
+              Upload financial data or enter manually for instant, professional valuation reports.
+            </p>
+            
+            <div className="grid md:grid-cols-3 gap-6 mb-8">
+              <div className="text-center">
+                <CalculatorIcon className="h-12 w-12 mx-auto mb-3 text-blue-200" />
+                <h3 className="font-semibold text-lg mb-2">💼 DCF Analysis</h3>
+                <p className="text-blue-100 text-sm">5-year cash flow projections with terminal value</p>
+              </div>
+              <div className="text-center">
+                <ChartBarIcon className="h-12 w-12 mx-auto mb-3 text-green-200" />
+                <h3 className="font-semibold text-lg mb-2">📊 UCaaS Metrics</h3>
+                <p className="text-blue-100 text-sm">MRR, CAC, LTV, and industry benchmarks</p>
+              </div>
+              <div className="text-center">
+                <CpuChipIcon className="h-12 w-12 mx-auto mb-3 text-purple-200" />
+                <h3 className="font-semibold text-lg mb-2">🤖 AI-Powered</h3>
+                <p className="text-blue-100 text-sm">Machine learning with qualitative factors</p>
+              </div>
+            </div>
+            
+            <Link
+              to="/comprehensive-valuation"
+              className="inline-flex items-center bg-white text-blue-600 font-semibold py-3 px-8 rounded-lg hover:bg-blue-50 transition-colors text-lg"
+            >
+              <RocketLaunchIcon className="h-6 w-6 mr-2" />
+              Start Comprehensive Valuation
+            </Link>
+          </div>
+        </div>
+      </div>
 
       {/* Main Content */}
       <main className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">

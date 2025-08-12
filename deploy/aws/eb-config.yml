@@ -1,0 +1,28 @@
+# AWS Elastic Beanstalk deployment configuration
+# Place this file in the server/ directory as .ebextensions/01_python.config
+
+option_settings:
+  aws:elasticbeanstalk:container:python:
+    WSGIPath: app.py
+  aws:elasticbeanstalk:application:environment:
+    FLASK_ENV: production
+    FLASK_DEBUG: 0
+    DATABASE_URL: "your-rds-connection-string"
+    JWT_SECRET: "your-secret-key"
+    OPENAI_API_KEY: "your-openai-key"
+  aws:autoscaling:asg:
+    MinSize: 1
+    MaxSize: 3
+  aws:ec2:instances:
+    InstanceTypes: t3.micro,t3.small
+
+packages:
+  yum:
+    git: []
+    gcc: []
+    python3-devel: []
+
+commands:
+  01_install_dependencies:
+    command: "/var/app/venv/staging-LQM1lest/bin/pip install -r requirements.txt"
+    leader_only: true

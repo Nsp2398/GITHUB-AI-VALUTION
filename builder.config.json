@@ -1,0 +1,39 @@
+{
+  "apiKey": "pub_your_api_key_here",
+  "previews": true,
+  "models": [
+    {
+      "name": "page",
+      "kind": "page",
+      "url": "/api/builder/page"
+    },
+    {
+      "name": "section",
+      "kind": "section"
+    },
+    {
+      "name": "component",
+      "kind": "component"
+    }
+  ],
+  "input": [
+    {
+      "name": "theme",
+      "type": "object",
+      "subFields": [
+        {
+          "name": "primaryColor",
+          "type": "color",
+          "defaultValue": "#3B82F6"
+        },
+        {
+          "name": "secondaryColor",
+          "type": "color",
+          "defaultValue": "#8B5CF6"
+        }
+      ]
+    }
+  ],
+  "command": "",
+  "serverUrl": "https://github.com/Nsp2398/Ai-20valuation"
+}

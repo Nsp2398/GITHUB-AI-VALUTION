@@ -6,12 +6,26 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-# Use SQLite for development
-SQLALCHEMY_DATABASE_URL = os.getenv('DATABASE_URL', 'sqlite:///./valuai.db')
+# Database URL with fallback to SQLite for development
+DATABASE_URL = os.getenv('DATABASE_URL')
+
+if DATABASE_URL is None:
+    # Default to SQLite for development
+    DATABASE_URL = 'sqlite:///./database/valuai.db'
+    connect_args = {"check_same_thread": False}
+elif DATABASE_URL.startswith('postgresql'):
+    # PostgreSQL configuration
+    connect_args = {
+        "pool_pre_ping": True,
+        "pool_recycle": 300,
+    }
+else:
+    connect_args = {}
 
 engine = create_engine(
-    SQLALCHEMY_DATABASE_URL,
-    connect_args={"check_same_thread": False}  # Needed for SQLite
+    DATABASE_URL,
+    connect_args=connect_args,
+    echo=os.getenv('DATABASE_ECHO', 'False').lower() == 'true'
 )
 
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
@@ -26,3 +40,7 @@ def get_db():
         yield db
     finally:
         db.close()
+
+def init_db():
+    """Initialize database tables."""
+    Base.metadata.create_all(bind=engine)

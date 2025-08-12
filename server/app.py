@@ -1,5 +1,6 @@
 from flask import Flask, request, jsonify
 from flask_cors import CORS
+from flask_jwt_extended import JWTManager
 from database.database import engine, get_db, SessionLocal
 from models.models import Base, Company, Valuation, User
 from services.valuation import DCFCalculator, UCaaSMetrics
@@ -7,28 +8,105 @@ from services.ai_service import ValuationAI
 from routes.reports import reports_bp
 from routes.files import files_bp
 from routes.auth import auth_bp
+from routes.comprehensive_valuation_routes import comprehensive_valuation_bp
+from routes.multi_model_valuation import multi_model_bp
+# from routes.analytics_routes import analytics_bp  # Disabled for basic SQLite setup
+
+# Import custom reporting and real-time services
+try:
+    from services.custom_reports import custom_reports_bp
+    CUSTOM_REPORTS_AVAILABLE = True
+except ImportError:
+    custom_reports_bp = None
+    CUSTOM_REPORTS_AVAILABLE = False
+    print("Custom reports service not available")
+
+try:
+    from services.realtime_dashboard import realtime_bp
+    REALTIME_AVAILABLE = True
+except ImportError:
+    realtime_bp = None
+    REALTIME_AVAILABLE = False
+    print("Real-time dashboard service not available")
+
+# Try to import SocketIO (optional for real-time features)
+try:
+    from flask_socketio import SocketIO
+    from services.realtime_dashboard import register_socketio_events
+    SOCKETIO_AVAILABLE = True
+except ImportError:
+    SocketIO = None
+    register_socketio_events = None
+    SOCKETIO_AVAILABLE = False
+    print("SocketIO not available - real-time features disabled")
+
 import os
 from dotenv import load_dotenv
 
 # Load environment variables
 load_dotenv()
 
+# Determine environment and load appropriate config
+environment = os.environ.get('FLASK_ENV', 'development')
+if environment == 'production' and os.environ.get('WEBSITE_INSTANCE_ID'):
+    # Running on Azure App Service
+    from azure_config import AzureConfig
+    config = AzureConfig
+    print("Using Azure production configuration")
+else:
+    # Local development or other environments
+    config = None
+    print(f"Using default configuration for {environment}")
+
 # Initialize Flask app
 app = Flask(__name__)
-CORS(app)
 
-# JWT Configuration
-app.config['JWT_SECRET_KEY'] = os.getenv('JWT_SECRET_KEY', 'your-secret-key-change-in-production')
-app.config['UPLOAD_FOLDER'] = os.path.join(os.path.dirname(__file__), 'uploads')
-app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB max file size
+# Apply configuration
+if config:
+    app.config.from_object(config)
+    # Configure CORS with Azure-specific origins
+    CORS(app, origins=config.CORS_ORIGINS)
+else:
+    # Default CORS for development
+    CORS(app)
+
+# Initialize SocketIO if available
+if SOCKETIO_AVAILABLE:
+    socketio = SocketIO(app, cors_allowed_origins="*")
+    # Register real-time event handlers
+    register_socketio_events(socketio)
+else:
+    socketio = None
+
+# JWT Configuration (override with config if available)
+if not config:
+    app.config['JWT_SECRET_KEY'] = os.getenv('JWT_SECRET_KEY', 'your-secret-key-change-in-production')
+    app.config['UPLOAD_FOLDER'] = os.path.join(os.path.dirname(__file__), 'uploads')
+    app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB max file size
+
+# Initialize JWT
+jwt = JWTManager(app)
 
 # Create upload directory if it doesn't exist
-os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
+upload_folder = app.config.get('UPLOAD_FOLDER', os.path.join(os.path.dirname(__file__), 'uploads'))
+os.makedirs(upload_folder, exist_ok=True)
 
 # Register blueprints
 app.register_blueprint(reports_bp, url_prefix='/api/reports')
 app.register_blueprint(files_bp, url_prefix='/api/files')
+app.register_blueprint(comprehensive_valuation_bp)
 app.register_blueprint(auth_bp, url_prefix='/api/auth')
+app.register_blueprint(multi_model_bp)
+# app.register_blueprint(analytics_bp)  # Disabled for basic SQLite setup
+
+# Register new service blueprints
+if CUSTOM_REPORTS_AVAILABLE and custom_reports_bp:
+    app.register_blueprint(custom_reports_bp)
+    print("Custom reports service registered")
+
+if REALTIME_AVAILABLE and realtime_bp:
+    app.register_blueprint(realtime_bp)
+    print("Real-time dashboard service registered")
 
 # Create database tables
 Base.metadata.create_all(bind=engine)
@@ -55,7 +133,32 @@ def root():
 
 @app.route('/api/health', methods=['GET'])
 def health_check():
-    return jsonify({"status": "ok", "message": "Server is running"}), 200
+    """Health check endpoint for Azure App Service and monitoring"""
+    try:
+        # Test database connection
+        db = SessionLocal()
+        db.execute("SELECT 1").fetchone()
+        db.close()
+        database_status = "healthy"
+    except Exception as e:
+        database_status = f"unhealthy: {str(e)}"
+    
+    health_status = {
+        "status": "ok" if database_status == "healthy" else "degraded",
+        "message": "ValuAI backend service",
+        "timestamp": request.environ.get('REQUEST_TIME', 'unknown'),
+        "version": "1.0.0",
+        "environment": os.environ.get('FLASK_ENV', 'development'),
+        "checks": {
+            "database": database_status,
+            "custom_reports": "available" if CUSTOM_REPORTS_AVAILABLE else "unavailable",
+            "realtime_dashboard": "available" if REALTIME_AVAILABLE else "unavailable",
+            "socketio": "available" if SOCKETIO_AVAILABLE else "unavailable"
+        }
+    }
+    
+    status_code = 200 if health_status["status"] == "ok" else 503
+    return jsonify(health_status), status_code
 
 @app.route('/api/companies', methods=['POST'])
 def create_company():
@@ -227,4 +330,9 @@ def create_valuation(company_id):
         db.close()
 
 if __name__ == '__main__':
-    app.run(debug=True)
+    if SOCKETIO_AVAILABLE and socketio:
+        # Run with SocketIO for real-time features
+        socketio.run(app, debug=True, host='0.0.0.0', port=5000)
+    else:
+        # Run standard Flask app
+        app.run(debug=True, host='0.0.0.0', port=5000)

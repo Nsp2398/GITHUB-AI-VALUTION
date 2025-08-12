@@ -9,7 +9,7 @@ import tempfile
 reports_bp = Blueprint('reports', __name__)
 market_data = UCaaSMarketData()
 
-@reports_bp.route('/generate-report', methods=['POST'])
+@reports_bp.route('/generate', methods=['POST'])
 def generate_report():
     try:
         data = request.json
