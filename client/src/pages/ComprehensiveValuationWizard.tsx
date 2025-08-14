@@ -75,12 +75,8 @@ export const ComprehensiveValuationWizard: React.FC = () => {
 
     try {
       setLoading(true);
-      const token = localStorage.getItem('token');
       const response = await fetch('/api/upload-financial-data', {
         method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`
-        },
         body: formData
       });
 
@@ -139,40 +135,29 @@ export const ComprehensiveValuationWizard: React.FC = () => {
           'Authorization': `Bearer ${token}`
         },
         body: JSON.stringify({
-          valuation_results: results,
-          format: format
+          companyName: results?.company_info?.name || 'Sample Company',
+          industry: results?.company_info?.industry || 'Technology', 
+          revenue: results?.company_info?.revenue || 5000000,
+          growthRate: results?.company_info?.growth_rate || 0.35,
+          ebitdaMargin: results?.company_info?.ebitda_margin || 0.25
         })
       });
 
       if (response.ok) {
         const data = await response.json();
-        if (format === 'all') {
-          // Download all formats as ZIP
-          const zipResponse = await fetch(`/api/reports/download-zip`, {
-            headers: { 'Authorization': `Bearer ${token}` }
-          });
-          if (zipResponse.ok) {
-            const blob = await zipResponse.blob();
-            const url = window.URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = 'comprehensive_valuation_report.zip';
-            a.click();
-          }
-        } else {
-          // Download single format
-          const filePath = data.file_paths[format];
-          const downloadResponse = await fetch(`/api/reports/download/${filePath.split('/').pop()}`, {
-            headers: { 'Authorization': `Bearer ${token}` }
-          });
-          if (downloadResponse.ok) {
-            const blob = await downloadResponse.blob();
-            const url = window.URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = filePath.split('/').pop();
-            a.click();
-          }
+        // Our backend returns { filename, report_url, message }
+        // Download the generated report
+        const downloadResponse = await fetch(data.report_url, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        if (downloadResponse.ok) {
+          const blob = await downloadResponse.blob();
+          const url = window.URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = data.filename;
+          a.click();
+          window.URL.revokeObjectURL(url);
         }
       } else {
         alert('Failed to generate report');

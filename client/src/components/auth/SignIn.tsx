@@ -28,35 +28,14 @@ export const SignIn: React.FC<SignInProps> = ({ onSwitchToSignUp, onSignIn, onFo
   const onSubmit = async (data: SignInFormData) => {
     try {
       setIsLoading(true);
-      
-      // Clear any previous errors
-      setError('root', { type: 'manual', message: '' });
-      
       await onSignIn({
         email: data.email,
         password: data.password,
       });
     } catch (error: any) {
-      console.error('SignIn error:', error);
-      
-      // Provide more specific error messages
-      let errorMessage = 'Invalid credentials. Please try again.';
-      
-      if (error.message) {
-        if (error.message.includes('Network')) {
-          errorMessage = 'Unable to connect to server. Please check your internet connection.';
-        } else if (error.message.includes('Invalid credentials')) {
-          errorMessage = 'Incorrect email or password. Please check your credentials.';
-        } else if (error.message.includes('User not found')) {
-          errorMessage = 'No account found with this email address.';
-        } else {
-          errorMessage = error.message;
-        }
-      }
-      
       setError('root', {
         type: 'manual',
-        message: errorMessage,
+        message: error.message || 'Invalid credentials. Please try again.',
       });
     } finally {
       setIsLoading(false);
@@ -158,9 +137,6 @@ export const SignIn: React.FC<SignInProps> = ({ onSwitchToSignUp, onSignIn, onFo
               {errors.password && (
                 <p className="text-red-300 text-sm">{errors.password.message}</p>
               )}
-              <p className="text-purple-300 text-xs">
-                Use your registered password. If you're having trouble, try clicking "Forgot password?" below.
-              </p>
             </div>
 
             {/* Remember Me & Forgot Password */}
@@ -181,13 +157,6 @@ export const SignIn: React.FC<SignInProps> = ({ onSwitchToSignUp, onSignIn, onFo
                 Forgot password?
               </button>
             </div>
-
-            {/* Error Display */}
-            {errors.root && (
-              <div className="bg-red-500/20 border border-red-400 rounded-lg p-3 backdrop-blur-sm">
-                <p className="text-red-300 text-sm font-medium">{errors.root.message}</p>
-              </div>
-            )}
 
             {/* Submit Button */}
             <button

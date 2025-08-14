@@ -42,7 +42,7 @@ const AuthForm = ({ onAuthSuccess }: { onAuthSuccess: (authData: any) => void })
           body: JSON.stringify({
             firstName: formData.firstName,
             lastName: formData.lastName,
-            emailOrPhone: usePhone ? formData.phone : formData.email,
+            email: usePhone ? formData.phone : formData.email,
             password: formData.password
           }),
         });
@@ -63,7 +63,7 @@ const AuthForm = ({ onAuthSuccess }: { onAuthSuccess: (authData: any) => void })
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({
-            emailOrPhone: usePhone ? formData.phone : formData.email,
+            email: usePhone ? formData.phone : formData.email,
             password: formData.password
           }),
         });
@@ -89,7 +89,7 @@ const AuthForm = ({ onAuthSuccess }: { onAuthSuccess: (authData: any) => void })
     setFormData({
       ...formData,
       email: 'nsp6575@gmail.com',
-      password: 'Sai@123456'
+      password: 'Newpassword123'
     });
     setUsePhone(false);
   };
@@ -278,11 +278,8 @@ const FileUploadSection = () => {
     });
 
     try {
-      const response = await fetch('http://localhost:5000/api/files/upload-batch', {
+      const response = await fetch('/api/files/upload-batch', {
         method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('authToken')}`
-        },
         body: formData,
       });
 
@@ -636,42 +633,34 @@ const ReportGeneration = () => {
     
     try {
       const sampleData = {
-        company_info: {
-          name: reportData.companyName,
-          arr: reportData.revenue,
-          industry: "UCaaS"
-        },
-        valuation_data: {
-          growth_rate: reportData.growthRate / 100,
-          gross_margin: 0.78,
-          net_revenue_retention: 1.15,
-          rule_of_40: 42.5,
-          ltv_cac_ratio: 4.2,
-          valuation: reportData.valuation,
-          revenue_multiple: 15.0,
-          ebitda_multiple: 45.0
-        },
-        market_data: {
-          market_size: 50000000000,
-          growth_rate: 0.12,
-          key_trends: ["Remote work adoption", "Cloud migration", "AI integration"]
-        }
+        companyName: reportData.companyName,
+        industry: "UCaaS",
+        revenue: parseFloat(reportData.revenue.toString()) || 5000000,
+        growthRate: parseFloat(reportData.growthRate.toString()) / 100 || 0.35,
+        ebitdaMargin: 0.25,
+        format: format
       };
 
-      const response = await fetch('http://localhost:5000/api/reports/generate', {
+      const response = await fetch('/api/reports/generate-direct', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${localStorage.getItem('authToken')}`
         },
-        body: JSON.stringify({
-          ...sampleData,
-          format: format
-        }),
+        body: JSON.stringify(sampleData),
       });
 
       if (response.ok) {
         const blob = await response.blob();
+        
+        // Check if blob is actually a JSON error response
+        if (blob.type === 'application/json') {
+          const text = await blob.text();
+          console.error('Received JSON error:', text);
+          alert('Report generation failed: ' + text);
+          return;
+        }
+        
         const url = window.URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
@@ -686,7 +675,9 @@ const ReportGeneration = () => {
         
         alert(`Report downloaded successfully in ${format} format!`);
       } else {
-        alert('Report generation failed');
+        const errorText = await response.text();
+        console.error('Report generation failed:', errorText);
+        alert('Report generation failed: ' + errorText);
       }
     } catch (error) {
       console.error('Report generation error:', error);

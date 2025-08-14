@@ -10,12 +10,14 @@ class User(Base):
     __tablename__ = 'users'
     
     id = Column(Integer, primary_key=True, autoincrement=True)
+    user_uuid = Column(String(36), unique=True, default=lambda: str(uuid.uuid4()))
     first_name = Column(String(50), nullable=False)
     last_name = Column(String(50), nullable=False)
     email = Column(String(120), unique=True, nullable=True, index=True)
     phone = Column(String(20), unique=True, nullable=True, index=True)
     password_hash = Column(String(255), nullable=False)
     is_active = Column(Boolean, default=True)
+    last_login = Column(DateTime, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     
@@ -24,6 +26,9 @@ class User(Base):
     valuations = relationship("Valuation", back_populates="user")
     file_uploads = relationship("FileUpload", back_populates="user")
     reports = relationship("Report", back_populates="user")
+    # Enhanced relationships
+    analytics = relationship("ValuationAnalytics", back_populates="user")
+    activities = relationship("UserActivity", back_populates="user")
 
 class Company(Base):
     __tablename__ = 'companies'
@@ -72,6 +77,10 @@ class Company(Base):
     user = relationship("User", back_populates="companies")
     valuations = relationship("Valuation", back_populates="company")
     file_uploads = relationship("FileUpload", back_populates="company")
+    # Enhanced relationships
+    analytics = relationship("ValuationAnalytics", back_populates="company")
+    metrics_history = relationship("CompanyMetricsHistory", back_populates="company")
+    comparables = relationship("CompanyComparables", back_populates="company")
 
 class Valuation(Base):
     __tablename__ = 'valuations'
@@ -117,6 +126,9 @@ class Valuation(Base):
     user = relationship("User", back_populates="valuations")
     company = relationship("Company", back_populates="valuations")
     reports = relationship("Report", back_populates="valuation")
+    # Enhanced relationships
+    analytics = relationship("ValuationAnalytics", back_populates="valuation")
+    ai_performance = relationship("AIModelPerformance", back_populates="valuation")
 
 class FileUpload(Base):
     __tablename__ = 'file_uploads'

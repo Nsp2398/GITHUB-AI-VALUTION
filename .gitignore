@@ -336,10 +336,6 @@ server/logs/
 server/reports/
 reports/
 test_downloaded_report.*
-*.pdf
-*.docx
-!*_template.*
-!*_example.*
 
 # Test files and temporary files
 test_*.py
@@ -361,7 +357,6 @@ fix_*.py
 fixed_*.py
 health_*.py
 install_*.py
-main_*.py
 minimal_*.py
 port_*.py
 proper_*.py
@@ -392,7 +387,6 @@ README_UPDATED.md
 # API and gateway files (temporary)
 api_*.py
 *_gateway.py
-*_server.py
 
 # Docker
 .dockerignore

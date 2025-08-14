@@ -34,11 +34,8 @@ export const Dashboard: React.FC = () => {
     });
 
     try {
-      const response = await fetch('http://localhost:5000/api/files/upload-batch', {
+      const response = await fetch('/api/files/upload-batch', {
         method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('authToken')}`
-        },
         body: formData,
       });
 
@@ -85,34 +82,40 @@ export const Dashboard: React.FC = () => {
         format: format
       };
 
-      const response = await fetch('http://localhost:5000/api/reports/generate-report', {
+      const response = await fetch('http://localhost:5000/api/generate-comprehensive-report', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${localStorage.getItem('authToken')}`
         },
-        body: JSON.stringify(sampleData)
+        body: JSON.stringify({
+          companyName: sampleData.company_info?.name || 'Sample Company',
+          industry: sampleData.company_info?.industry || 'Technology',
+          revenue: sampleData.company_info?.arr || 5000000,
+          growthRate: sampleData.valuation_data?.growth_rate || 0.35,
+          ebitdaMargin: sampleData.valuation_data?.gross_margin || 0.25
+        })
       });
 
       if (response.ok) {
-        // Get filename from response headers or create one
-        const contentDisposition = response.headers.get('content-disposition');
-        let filename = 'valuation_report';
-        if (contentDisposition) {
-          const match = contentDisposition.match(/filename="(.+)"/);
-          if (match) filename = match[1];
+        const data = await response.json();
+        // Our backend returns { filename, report_url, message }
+        // Download the generated report
+        const downloadResponse = await fetch(data.report_url, {
+          headers: { 'Authorization': `Bearer ${localStorage.getItem('authToken')}` }
+        });
+        if (downloadResponse.ok) {
+          const blob = await downloadResponse.blob();
+          const url = window.URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = data.filename;
+          a.click();
+          window.URL.revokeObjectURL(url);
+          alert('Report generated and downloaded successfully!');
+        } else {
+          throw new Error('Download failed');
         }
-        
-        // Download the file
-        const blob = await response.blob();
-        const url = window.URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = filename;
-        a.click();
-        window.URL.revokeObjectURL(url);
-        
-        alert('Report generated and downloaded successfully!');
       } else {
         throw new Error('Report generation failed');
       }

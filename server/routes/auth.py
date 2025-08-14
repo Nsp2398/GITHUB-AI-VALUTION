@@ -27,14 +27,18 @@ def signup():
     db = SessionLocal()
     
     try:
-        # Validate required fields
-        required_fields = ['firstName', 'lastName', 'emailOrPhone', 'password']
+        # Validate required fields - support both 'email' and 'emailOrPhone'
+        required_fields = ['firstName', 'lastName', 'password']
         for field in required_fields:
             if not data.get(field):
                 return jsonify({'error': f'{field} is required'}), 400
         
+        # Support both 'email' and 'emailOrPhone' for compatibility
+        email_or_phone = data.get('email') or data.get('emailOrPhone')
+        if not email_or_phone:
+            return jsonify({'error': 'Email is required'}), 400
+        
         # Validate email or phone
-        email_or_phone = data['emailOrPhone']
         is_email = validate_email(email_or_phone)
         is_phone = validate_phone(email_or_phone)
         
@@ -99,14 +103,14 @@ def signin():
     try:
         print(f"Signin attempt with data: {data}")  # Debug logging
         
-        # Validate required fields
-        email_or_phone = data.get('emailOrPhone')
+        # Support both 'email' and 'emailOrPhone' for compatibility
+        email_or_phone = data.get('email') or data.get('emailOrPhone')
         password = data.get('password')
         
         print(f"Email/Phone: {email_or_phone}, Password provided: {bool(password)}")  # Debug logging
         
         if not email_or_phone or not password:
-            return jsonify({'error': 'Email/phone and password are required'}), 400
+            return jsonify({'error': 'Email and password are required'}), 400
         
         # Find user by email or phone
         is_email = validate_email(email_or_phone)
@@ -128,6 +132,10 @@ def signin():
         if not check_password_hash(user.password_hash, password):
             print("Password check failed")
             return jsonify({'error': 'Invalid credentials'}), 401
+        
+        # Update last login
+        user.last_login = datetime.datetime.utcnow()
+        db.commit()
         
         # Generate token using Flask-JWT-Extended
         token = create_access_token(identity=user.id, expires_delta=datetime.timedelta(hours=24))
@@ -169,7 +177,8 @@ def get_current_user():
                 'lastName': user.last_name,
                 'email': user.email,
                 'phone': user.phone,
-                'createdAt': user.created_at.isoformat()
+                'createdAt': user.created_at.isoformat(),
+                'lastLogin': user.last_login.isoformat() if user.last_login else None
             }
         }), 200
         

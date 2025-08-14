@@ -17,13 +17,15 @@ export default defineConfig({
     },
   },
   server: {
-    port: 5173,
-    host: true,
+    port: 5173, // Using standard Vite port 5173
+    host: '127.0.0.1', // Explicit host binding for Windows compatibility
+    strictPort: true,
     proxy: {
       '/api': {
-        target: 'http://localhost:5000',
+        target: 'http://127.0.0.1:5002', // Backend running on port 5002
         changeOrigin: true,
-        secure: false
+        secure: false,
+        rewrite: (path) => path
       },
     },
   },

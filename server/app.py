@@ -10,7 +10,7 @@ from routes.files import files_bp
 from routes.auth import auth_bp
 from routes.comprehensive_valuation_routes import comprehensive_valuation_bp
 from routes.multi_model_valuation import multi_model_bp
-# from routes.analytics_routes import analytics_bp  # Disabled for basic SQLite setup
+from routes.analytics_routes import analytics_bp
 
 # Import custom reporting and real-time services
 try:
@@ -97,7 +97,7 @@ app.register_blueprint(files_bp, url_prefix='/api/files')
 app.register_blueprint(comprehensive_valuation_bp)
 app.register_blueprint(auth_bp, url_prefix='/api/auth')
 app.register_blueprint(multi_model_bp)
-# app.register_blueprint(analytics_bp)  # Disabled for basic SQLite setup
+app.register_blueprint(analytics_bp)
 
 # Register new service blueprints
 if CUSTOM_REPORTS_AVAILABLE and custom_reports_bp:

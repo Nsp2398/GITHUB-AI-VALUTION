@@ -305,59 +305,39 @@ const ValuationAnalysis: React.FC<ValuationAnalysisProps> = ({ companyData }) =>
     }, 2000);
   }, [companyData]);
 
-  const downloadReport = async (format: string) => {
+  const downloadReport = async () => {
     try {
-      const reportData = {
-        company_info: {
-          name: companyData.companyName,
-          arr: parseFloat(companyData.revenue),
-          industry: "UCaaS",
-          employees: companyData.employees,
-          customers: companyData.customerCount
-        },
-        valuation_data: {
-          dcf_valuation: valuationResults.dcf,
-          ucaas_valuation: valuationResults.ucaas,
-          ai_valuation: valuationResults.ai,
-          final_valuation: valuationResults.final,
-          confidence_score: valuationResults.confidence,
-          growth_rate: parseFloat(companyData.growthRate) / 100,
-          churn_rate: parseFloat(companyData.churnRate) / 100,
-          ltv_cac_ratio: parseFloat(companyData.ltv) / parseFloat(companyData.cac),
-          revenue_multiple: valuationResults.ucaas / parseFloat(companyData.revenue)
-        },
-        market_data: {
-          market_size: 50000000000,
-          growth_rate: 0.12,
-          key_trends: ["Remote work adoption", "Cloud migration", "AI integration", "Security focus"]
-        }
-      };
-
-      const response = await fetch('http://localhost:5000/api/reports/generate', {
+      const response = await fetch('http://localhost:5000/api/generate-comprehensive-report', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${localStorage.getItem('authToken')}`
         },
         body: JSON.stringify({
-          ...reportData,
-          format: format
+          companyName: companyData.companyName,
+          industry: "UCaaS",
+          revenue: parseFloat(companyData.revenue) || 5000000,
+          growthRate: parseFloat(companyData.growthRate) / 100 || 0.35,
+          ebitdaMargin: 0.25
         }),
       });
 
       if (response.ok) {
-        const blob = await response.blob();
-        const url = window.URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        
-        const fileExtension = format === 'all' ? 'zip' : format;
-        a.download = `${companyData.companyName}_valuation_report.${fileExtension}`;
-        
-        document.body.appendChild(a);
-        a.click();
-        window.URL.revokeObjectURL(url);
-        document.body.removeChild(a);
+        const data = await response.json();
+        // Our backend returns { filename, report_url, message }
+        // Download the generated report
+        const downloadResponse = await fetch(data.report_url, {
+          headers: { 'Authorization': `Bearer ${localStorage.getItem('authToken')}` }
+        });
+        if (downloadResponse.ok) {
+          const blob = await downloadResponse.blob();
+          const url = window.URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = data.filename;
+          a.click();
+          window.URL.revokeObjectURL(url);
+        }
       } else {
         alert('Report generation failed');
       }
@@ -565,7 +545,7 @@ const ValuationAnalysis: React.FC<ValuationAnalysisProps> = ({ companyData }) =>
           {['pdf', 'docx', 'xlsx', 'png', 'txt', 'all'].map((format) => (
             <button
               key={format}
-              onClick={() => downloadReport(format)}
+              onClick={() => downloadReport()}
               className="px-4 py-3 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-lg hover:from-indigo-700 hover:to-purple-700 transition-all text-sm font-medium flex flex-col items-center"
             >
               <span className="text-lg mb-1">
