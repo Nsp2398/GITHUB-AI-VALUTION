@@ -28,7 +28,7 @@ def create_test_user():
             first_name='Test',
             last_name='User',
             email='nsp6575@gmail.com',
-            password_hash=generate_password_hash('Sai@123456'),
+            password_hash=generate_password_hash('Newpassword123'),
             is_active=True
         )
         
@@ -37,7 +37,7 @@ def create_test_user():
         
         print("✅ Test user created successfully!")
         print(f"Email: nsp6575@gmail.com")
-        print(f"Password: Sai@123456")
+        print(f"Password: Newpassword123")
         print(f"Name: {test_user.first_name} {test_user.last_name}")
         
         return test_user

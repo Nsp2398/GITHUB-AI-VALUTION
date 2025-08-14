@@ -19,6 +19,14 @@ openpyxl==3.1.2
 Werkzeug==2.3.7
 flask-socketio==5.3.6
 python-socketio==5.8.0
-matplotlib==3.7.2
-seaborn==0.12.2
 python-pptx==0.6.21
+gunicorn==21.2.0
+azure-storage-blob==12.17.0
+azure-identity==1.14.0
+azure-keyvault-secrets==4.7.0
+applicationinsights==0.11.10
+flask-migrate==4.0.5
+
+# Optional dependencies for enhanced features
+# matplotlib==3.7.2
+# seaborn==0.12.2

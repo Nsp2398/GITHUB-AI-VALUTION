@@ -332,6 +332,68 @@ server/data/
 server/uploads/
 server/logs/
 
+# Generated reports (exclude test reports but keep examples)
+server/reports/
+reports/
+test_downloaded_report.*
+*.pdf
+*.docx
+!*_template.*
+!*_example.*
+
+# Test files and temporary files
+test_*.py
+test_*.csv
+test_*.txt
+test_*.html
+*_test.py
+*_debug.py
+simple_*.py
+debug_*.py
+comprehensive_*.py
+auto_*.py
+clean_*.py
+combined_*.py
+complete_*.py
+enhanced_*.py
+final_*.py
+fix_*.py
+fixed_*.py
+health_*.py
+install_*.py
+main_*.py
+minimal_*.py
+port_*.py
+proper_*.py
+quick_*.py
+robust_*.py
+server_*.py
+working_*.py
+
+# Batch and script files (temporary)
+*.bat
+*.ps1
+start_*.bat
+start_*.ps1
+enable_*.bat
+enable_*.ps1
+
+# Documentation files (temporary/status)
+*_SUMMARY.md
+*_REPORT.md
+*_STATUS.md
+*_ANALYSIS.md
+*_PLAN.md
+*_REVIEW.md
+*_SOLUTION.md
+*_IMPLEMENTATION.md
+README_UPDATED.md
+
+# API and gateway files (temporary)
+api_*.py
+*_gateway.py
+*_server.py
+
 # Docker
 .dockerignore
 docker-compose.override.yml

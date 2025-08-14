@@ -35,6 +35,8 @@ const MultiModelValuation: React.FC<ValuationAnalysisProps> = ({ companyData }) 
   const [selectedModel, setSelectedModel] = useState<string>('');
   const [aiRecommendation, setAiRecommendation] = useState<string>('');
   const [showAllMethods, setShowAllMethods] = useState(false);
+  const [isDownloading, setIsDownloading] = useState(false);
+  const [downloadProgress, setDownloadProgress] = useState('');
   const [valuationResults, setValuationResults] = useState({
     berkus: 0,
     scorecard: 0,
@@ -343,81 +345,85 @@ const MultiModelValuation: React.FC<ValuationAnalysisProps> = ({ companyData }) 
   };
 
   const downloadReport = async (format: string) => {
+    setIsDownloading(true);
+    setDownloadProgress(`Generating ${format.toUpperCase()} report...`);
+    
     try {
       console.log('Starting download for format:', format);
       
       const reportData = {
-        company_info: {
-          name: companyData.companyName,
-          arr: parseFloat(companyData.revenue) || 0,
-          industry: "Multi-sector",
-          employees: parseInt(companyData.employees) || 0,
-          customers: parseInt(companyData.customerCount) || 0
-        },
-        valuation_data: {
-          selected_method: valuationResults.selectedMethod,
-          methodology: valuationResults.methodology,
-          berkus_valuation: valuationResults.berkus,
-          scorecard_valuation: valuationResults.scorecard,
-          risk_factor_valuation: valuationResults.riskFactor,
-          vc_method_valuation: valuationResults.vcMethod,
-          dcf_valuation: valuationResults.dcf,
-          comparables_valuation: valuationResults.comparables,
-          final_valuation: valuationResults.final,
-          confidence_score: valuationResults.confidence,
-          growth_rate: parseFloat(companyData.growthRate) / 100 || 0
-        },
-        market_data: {
-          market_size: 50000000000,
-          growth_rate: 0.12,
-          key_trends: ["Digital transformation", "Remote work", "AI adoption", "ESG focus"]
-        }
+        companyName: companyData.companyName,
+        industry: "Technology",
+        revenue: parseFloat(companyData.revenue) || 5000000,
+        growthRate: parseFloat(companyData.growthRate) / 100 || 0.35,
+        ebitdaMargin: 0.25,
+        format: format
       };
 
-      console.log('Sending request to:', `http://localhost:5000/api/reports/generate`);
+      console.log('Sending request to:', `/api/reports/generate-direct`);
       console.log('Report data:', reportData);
 
-      const response = await fetch('http://localhost:5000/api/reports/generate', {
+      setDownloadProgress(`Connecting to server...`);
+      
+      const response = await fetch('/api/reports/generate-direct', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${localStorage.getItem('authToken')}`
         },
-        body: JSON.stringify({
-          ...reportData,
-          format: format
-        }),
+        body: JSON.stringify(reportData),
       });
 
       console.log('Response status:', response.status);
       console.log('Response headers:', response.headers);
 
-      if (response.ok) {
-        const blob = await response.blob();
-        console.log('Blob received, size:', blob.size);
-        
-        const url = window.URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        
-        const fileExtension = format === 'all' ? 'zip' : format;
-        a.download = `${companyData.companyName}_${valuationResults.selectedMethod}_valuation_report.${fileExtension}`;
-        
-        document.body.appendChild(a);
-        a.click();
-        window.URL.revokeObjectURL(url);
-        document.body.removeChild(a);
-        
-        alert(`Report downloaded successfully in ${format} format!`);
-      } else {
+      if (!response.ok) {
         const errorText = await response.text();
-        console.error('Download failed:', response.status, errorText);
-        alert(`Report generation failed: ${errorText}`);
+        throw new Error(`Failed to generate report (${response.status}): ${errorText}`);
       }
+
+      setDownloadProgress(`Processing file...`);
+      const blob = await response.blob();
+      console.log('Blob received, size:', blob.size);
+      
+      // Check file size before download
+      if (blob.size < 100) {
+        throw new Error('The generated file seems empty or invalid (file size too small)');
+      }
+      
+      // Check if blob is actually a JSON error response
+      if (blob.type === 'application/json') {
+        const text = await blob.text();
+        console.error('Received JSON error:', text);
+        throw new Error(`Server error: ${text}`);
+      }
+      
+      setDownloadProgress(`Downloading file...`);
+      
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      
+      const fileExtension = format === 'all' ? 'zip' : format;
+      // Create safe filename
+      const safeName = companyData.companyName.replace(/[^a-zA-Z0-9]/g, '_');
+      a.download = `${safeName}_${valuationResults.selectedMethod}_valuation_report.${fileExtension}`;
+      
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      window.URL.revokeObjectURL(url);
+      
+      setDownloadProgress(`Report downloaded successfully!`);
+      setTimeout(() => setDownloadProgress(''), 3000);
+      
     } catch (error) {
       console.error('Report generation error:', error);
       const errorMessage = error instanceof Error ? error.message : String(error);
-      alert(`Report generation failed: ${errorMessage}`);
+      setDownloadProgress(`Error: ${errorMessage}`);
+      setTimeout(() => setDownloadProgress(''), 5000);
+    } finally {
+      setIsDownloading(false);
     }
   };
 
@@ -651,9 +657,16 @@ const MultiModelValuation: React.FC<ValuationAnalysisProps> = ({ companyData }) 
           </button>
           <button
             onClick={() => downloadReport('pdf')}
-            className="px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+            disabled={isDownloading}
+            className={`px-6 py-2 ${isDownloading 
+              ? 'bg-gray-400 cursor-not-allowed' 
+              : 'bg-green-600 hover:bg-green-700'
+            } text-white rounded-lg transition-colors flex items-center space-x-2`}
           >
-            Download Report →
+            {isDownloading && (
+              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+            )}
+            <span>{isDownloading ? 'Generating...' : 'Download Report →'}</span>
           </button>
         </div>
       </div>
@@ -665,12 +678,30 @@ const MultiModelValuation: React.FC<ValuationAnalysisProps> = ({ companyData }) 
           Generate detailed valuation reports including methodology, assumptions, and comparative analysis.
         </p>
         
+        {/* Progress Indicator */}
+        {(isDownloading || downloadProgress) && (
+          <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+            <div className="flex items-center space-x-3">
+              {isDownloading && (
+                <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-600"></div>
+              )}
+              <span className={`text-sm font-medium ${isDownloading ? 'text-blue-700' : downloadProgress.includes('Error') ? 'text-red-700' : 'text-green-700'}`}>
+                {downloadProgress || 'Generating your report, please wait...'}
+              </span>
+            </div>
+          </div>
+        )}
+        
         <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
           {['pdf', 'docx', 'png', 'txt', 'all'].map((format) => (
             <button
               key={format}
               onClick={() => downloadReport(format)}
-              className="px-4 py-3 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-lg hover:from-indigo-700 hover:to-purple-700 transition-all text-sm font-medium flex flex-col items-center"
+              disabled={isDownloading}
+              className={`px-4 py-3 ${isDownloading 
+                ? 'bg-gray-400 cursor-not-allowed' 
+                : 'bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700'
+              } text-white rounded-lg transition-all text-sm font-medium flex flex-col items-center`}
             >
               <span className="text-lg mb-1">
                 {format === 'pdf' && '📄'}

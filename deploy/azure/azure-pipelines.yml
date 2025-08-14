@@ -1,0 +1,198 @@
+# Azure DevOps Pipeline for ValuAI UCaaS Valuation Platform
+# This pipeline builds and deploys both frontend and backend to Azure App Service
+
+trigger:
+  branches:
+    include:
+    - main
+    - develop
+
+variables:
+  # Azure Service Connection (configure in Azure DevOps)
+  azureServiceConnectionId: 'valuai-service-connection'
+  
+  # Azure Resource Group and App Services
+  resourceGroupName: 'valuai-rg'
+  backendAppName: 'valuai-backend'
+  frontendAppName: 'valuai-frontend'
+  
+  # Build configuration
+  pythonVersion: '3.11'
+  nodeVersion: '18.x'
+
+stages:
+- stage: Build
+  displayName: Build stage
+  jobs:
+  - job: BuildBackend
+    displayName: Build Backend (Python Flask)
+    pool:
+      vmImage: 'ubuntu-latest'
+    steps:
+    - task: UsePythonVersion@0
+      inputs:
+        versionSpec: '$(pythonVersion)'
+      displayName: 'Use Python $(pythonVersion)'
+
+    - script: |
+        cd server
+        python -m venv venv
+        source venv/bin/activate
+        pip install --upgrade pip
+        pip install -r requirements.txt
+      displayName: 'Install Backend Dependencies'
+
+    - script: |
+        cd server
+        source venv/bin/activate
+        python -m pytest tests/ --junitxml=test-results.xml --cov=. --cov-report=xml
+      displayName: 'Run Backend Tests'
+      continueOnError: true
+
+    - task: PublishTestResults@2
+      inputs:
+        testResultsFiles: 'server/test-results.xml'
+        testRunTitle: 'Backend Tests'
+      condition: succeededOrFailed()
+
+    - task: ArchiveFiles@2
+      displayName: 'Archive Backend Files'
+      inputs:
+        rootFolderOrFile: 'server'
+        includeRootFolder: false
+        archiveType: zip
+        archiveFile: $(Build.ArtifactStagingDirectory)/backend-$(Build.BuildId).zip
+        replaceExistingArchive: true
+
+    - upload: $(Build.ArtifactStagingDirectory)/backend-$(Build.BuildId).zip
+      artifact: backend
+
+  - job: BuildFrontend
+    displayName: Build Frontend (React + TypeScript)
+    pool:
+      vmImage: 'ubuntu-latest'
+    steps:
+    - task: NodeTool@0
+      inputs:
+        versionSpec: '$(nodeVersion)'
+      displayName: 'Use Node.js $(nodeVersion)'
+
+    - script: |
+        cd client
+        npm ci
+        npm run build
+      displayName: 'Install Dependencies and Build Frontend'
+
+    - script: |
+        cd client
+        npm test -- --coverage --watchAll=false
+      displayName: 'Run Frontend Tests'
+      continueOnError: true
+
+    - task: ArchiveFiles@2
+      displayName: 'Archive Frontend Build'
+      inputs:
+        rootFolderOrFile: 'client/dist'
+        includeRootFolder: false
+        archiveType: zip
+        archiveFile: $(Build.ArtifactStagingDirectory)/frontend-$(Build.BuildId).zip
+        replaceExistingArchive: true
+
+    - upload: $(Build.ArtifactStagingDirectory)/frontend-$(Build.BuildId).zip
+      artifact: frontend
+
+- stage: DeployDev
+  displayName: Deploy to Development
+  dependsOn: Build
+  condition: succeeded()
+  jobs:
+  - deployment: DeployBackendDev
+    displayName: Deploy Backend to Development
+    pool:
+      vmImage: 'ubuntu-latest'
+    environment: 'development'
+    strategy:
+      runOnce:
+        deploy:
+          steps:
+          - download: current
+            artifact: backend
+
+          - task: AzureWebApp@1
+            displayName: 'Deploy Backend to Azure App Service'
+            inputs:
+              azureSubscription: $(azureServiceConnectionId)
+              appType: 'webAppLinux'
+              appName: '$(backendAppName)-dev'
+              package: $(Pipeline.Workspace)/backend/backend-$(Build.BuildId).zip
+              runtimeStack: 'PYTHON|3.11'
+              startUpCommand: 'gunicorn --bind 0.0.0.0:8000 app:app'
+
+  - deployment: DeployFrontendDev
+    displayName: Deploy Frontend to Development
+    pool:
+      vmImage: 'ubuntu-latest'
+    environment: 'development'
+    strategy:
+      runOnce:
+        deploy:
+          steps:
+          - download: current
+            artifact: frontend
+
+          - task: AzureWebApp@1
+            displayName: 'Deploy Frontend to Azure App Service'
+            inputs:
+              azureSubscription: $(azureServiceConnectionId)
+              appType: 'webAppLinux'
+              appName: '$(frontendAppName)-dev'
+              package: $(Pipeline.Workspace)/frontend/frontend-$(Build.BuildId).zip
+              runtimeStack: 'NODE|18-lts'
+
+- stage: DeployProd
+  displayName: Deploy to Production
+  dependsOn: DeployDev
+  condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/main'))
+  jobs:
+  - deployment: DeployBackendProd
+    displayName: Deploy Backend to Production
+    pool:
+      vmImage: 'ubuntu-latest'
+    environment: 'production'
+    strategy:
+      runOnce:
+        deploy:
+          steps:
+          - download: current
+            artifact: backend
+
+          - task: AzureWebApp@1
+            displayName: 'Deploy Backend to Azure App Service'
+            inputs:
+              azureSubscription: $(azureServiceConnectionId)
+              appType: 'webAppLinux'
+              appName: '$(backendAppName)'
+              package: $(Pipeline.Workspace)/backend/backend-$(Build.BuildId).zip
+              runtimeStack: 'PYTHON|3.11'
+              startUpCommand: 'gunicorn --bind 0.0.0.0:8000 app:app'
+
+  - deployment: DeployFrontendProd
+    displayName: Deploy Frontend to Production
+    pool:
+      vmImage: 'ubuntu-latest'
+    environment: 'production'
+    strategy:
+      runOnce:
+        deploy:
+          steps:
+          - download: current
+            artifact: frontend
+
+          - task: AzureWebApp@1
+            displayName: 'Deploy Frontend to Azure App Service'
+            inputs:
+              azureSubscription: $(azureServiceConnectionId)
+              appType: 'webAppLinux'
+              appName: '$(frontendAppName)'
+              package: $(Pipeline.Workspace)/frontend/frontend-$(Build.BuildId).zip
+              runtimeStack: 'NODE|18-lts'
