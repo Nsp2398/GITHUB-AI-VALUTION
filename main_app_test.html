@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Main App Upload Test</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 40px; background: #f5f5f5; }
+        .container { max-width: 900px; margin: 0 auto; background: white; padding: 30px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+        .test-section { margin: 20px 0; padding: 20px; border: 2px solid #ddd; border-radius: 8px; background: #fafafa; }
+        .success { color: #28a745; font-weight: bold; }
+        .error { color: #dc3545; font-weight: bold; }
+        .warning { color: #ffc107; font-weight: bold; }
+        button { padding: 12px 24px; margin: 10px 5px; cursor: pointer; background: #007bff; color: white; border: none; border-radius: 5px; font-size: 14px; }
+        button:hover { background: #0056b3; }
+        input[type="file"], input[type="email"], input[type="password"] { margin: 5px; padding: 8px; border: 1px solid #ddd; border-radius: 4px; }
+        input[type="email"], input[type="password"] { width: 200px; }
+        pre { background: #f8f9fa; padding: 15px; border-radius: 5px; overflow-x: auto; border: 1px solid #e9ecef; }
+        .status { font-size: 16px; margin: 10px 0; }
+        .step { margin: 15px 0; padding: 15px; background: #e9ecef; border-left: 4px solid #007bff; border-radius: 4px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔧 Main Application Upload Test</h1>
+        <p><strong>Testing:</strong> Frontend (5173) → Backend (5000)</p>
+        
+        <div class="test-section">
+            <h3>Step 1: Server Health Check</h3>
+            <button onclick="testHealth()">Check Backend Health</button>
+            <div id="health-result" class="status"></div>
+        </div>
+
+        <div class="test-section">
+            <h3>Step 2: Login & Get Token</h3>
+            <div class="step">
+                <input type="email" id="email" placeholder="Email" value="nsp6575@gmail.com">
+                <input type="password" id="password" placeholder="Password" value="test123">
+                <button onclick="testLogin()">Login</button>
+            </div>
+            <div id="login-result" class="status"></div>
+        </div>
+
+        <div class="test-section">
+            <h3>Step 3: File Upload</h3>
+            <div class="step">
+                <input type="file" id="fileInput">
+                <button onclick="testUpload()">Upload File</button>
+                <button onclick="testUploadNoAuth()">Upload Without Auth (Should Fail)</button>
+            </div>
+            <div id="upload-result" class="status"></div>
+        </div>
+
+        <div class="test-section">
+            <h3>Step 4: Complete Flow Test</h3>
+            <button onclick="runCompleteTest()">Run Complete Upload Flow</button>
+            <div id="complete-result" class="status"></div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = 'http://localhost:5000/api';
+        let authToken = localStorage.getItem('token');
+
+        async function testHealth() {
+            const resultDiv = document.getElementById('health-result');
+            
+            try {
+                const response = await fetch(`${API_BASE}/health`);
+                const data = await response.json();
+                
+                if (response.ok) {
+                    resultDiv.innerHTML = `<div class="success">✅ Backend healthy!<br><pre>${JSON.stringify(data, null, 2)}</pre></div>`;
+                } else {
+                    resultDiv.innerHTML = `<div class="error">❌ Backend error: ${response.status}</div>`;
+                }
+            } catch (error) {
+                resultDiv.innerHTML = `<div class="error">❌ Cannot connect to backend: ${error.message}</div>`;
+            }
+        }
+
+        async function testLogin() {
+            const resultDiv = document.getElementById('login-result');
+            const email = document.getElementById('email').value;
+            const password = document.getElementById('password').value;
+
+            try {
+                const response = await fetch(`${API_BASE}/auth/signin`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email, password })
+                });
+
+                const data = await response.json();
+                
+                if (response.ok && data.token) {
+                    authToken = data.token;
+                    localStorage.setItem('token', authToken);
+                    resultDiv.innerHTML = `<div class="success">✅ Login successful!<br>Token: ${authToken.substring(0, 30)}...</div>`;
+                } else {
+                    resultDiv.innerHTML = `<div class="error">❌ Login failed: <pre>${JSON.stringify(data, null, 2)}</pre></div>`;
+                }
+            } catch (error) {
+                resultDiv.innerHTML = `<div class="error">❌ Login error: ${error.message}</div>`;
+            }
+        }
+
+        async function testUpload() {
+            const resultDiv = document.getElementById('upload-result');
+            const fileInput = document.getElementById('fileInput');
+            
+            if (!fileInput.files.length) {
+                resultDiv.innerHTML = '<div class="error">❌ Please select a file first</div>';
+                return;
+            }
+
+            if (!authToken) {
+                resultDiv.innerHTML = '<div class="error">❌ Please login first</div>';
+                return;
+            }
+
+            try {
+                const formData = new FormData();
+                formData.append('file', fileInput.files[0]);
+
+                const response = await fetch(`${API_BASE}/files/upload`, {
+                    method: 'POST',
+                    body: formData,
+                    headers: { 'Authorization': `Bearer ${authToken}` }
+                });
+
+                const data = await response.json();
+                
+                if (response.ok) {
+                    resultDiv.innerHTML = `<div class="success">✅ Upload successful!<br><pre>${JSON.stringify(data, null, 2)}</pre></div>`;
+                } else {
+                    resultDiv.innerHTML = `<div class="error">❌ Upload failed (${response.status}): <pre>${JSON.stringify(data, null, 2)}</pre></div>`;
+                }
+            } catch (error) {
+                resultDiv.innerHTML = `<div class="error">❌ Upload error: ${error.message}</div>`;
+            }
+        }
+
+        async function testUploadNoAuth() {
+            const resultDiv = document.getElementById('upload-result');
+            const fileInput = document.getElementById('fileInput');
+            
+            if (!fileInput.files.length) {
+                resultDiv.innerHTML = '<div class="error">❌ Please select a file first</div>';
+                return;
+            }
+
+            try {
+                const formData = new FormData();
+                formData.append('file', fileInput.files[0]);
+
+                const response = await fetch(`${API_BASE}/files/upload`, {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const data = await response.json();
+                
+                if (response.status === 401) {
+                    resultDiv.innerHTML = `<div class="success">✅ Correctly rejected unauthorized upload</div>`;
+                } else {
+                    resultDiv.innerHTML = `<div class="warning">⚠️ Unexpected response: <pre>${JSON.stringify(data, null, 2)}</pre></div>`;
+                }
+            } catch (error) {
+                resultDiv.innerHTML = `<div class="error">❌ Upload error: ${error.message}</div>`;
+            }
+        }
+
+        async function runCompleteTest() {
+            const resultDiv = document.getElementById('complete-result');
+            resultDiv.innerHTML = '<div class="warning">🔄 Running complete upload flow...</div>';
+            
+            const steps = [];
+            
+            // Step 1: Health check
+            try {
+                const healthResponse = await fetch(`${API_BASE}/health`);
+                steps.push(healthResponse.ok ? '✅ Health check' : '❌ Health check failed');
+            } catch (e) {
+                steps.push('❌ Health check failed');
+            }
+            
+            // Step 2: Login
+            try {
+                const loginResponse = await fetch(`${API_BASE}/auth/signin`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email: 'nsp6575@gmail.com', password: 'test123' })
+                });
+                const loginData = await loginResponse.json();
+                if (loginResponse.ok && loginData.token) {
+                    authToken = loginData.token;
+                    steps.push('✅ Login successful');
+                } else {
+                    steps.push('❌ Login failed');
+                }
+            } catch (e) {
+                steps.push('❌ Login error');
+            }
+            
+            // Step 3: Create test file and upload
+            const fileInput = document.getElementById('fileInput');
+            if (fileInput.files.length && authToken) {
+                try {
+                    const formData = new FormData();
+                    formData.append('file', fileInput.files[0]);
+
+                    const uploadResponse = await fetch(`${API_BASE}/files/upload`, {
+                        method: 'POST',
+                        body: formData,
+                        headers: { 'Authorization': `Bearer ${authToken}` }
+                    });
+                    
+                    steps.push(uploadResponse.ok ? '✅ File upload successful' : '❌ File upload failed');
+                } catch (e) {
+                    steps.push('❌ File upload error');
+                }
+            } else {
+                steps.push('⚠️ No file selected or no auth token');
+            }
+            
+            resultDiv.innerHTML = `<div>${steps.join('<br>')}</div>`;
+        }
+
+        // Auto-run health check
+        window.onload = function() {
+            testHealth();
+            if (authToken) {
+                document.getElementById('login-result').innerHTML = `<div class="success">✅ Found saved token</div>`;
+            }
+        };
+    </script>
+</body>
+</html>

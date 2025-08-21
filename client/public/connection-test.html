@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Simple Server Connection Test</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .test { margin: 20px 0; padding: 15px; border: 1px solid #ddd; border-radius: 5px; }
+        .success { background: #d4edda; color: #155724; }
+        .error { background: #f8d7da; color: #721c24; }
+        button { padding: 10px 20px; margin: 5px; background: #007bff; color: white; border: none; cursor: pointer; }
+        pre { background: #f8f9fa; padding: 10px; border-radius: 3px; }
+    </style>
+</head>
+<body>
+    <h1>Server Connection Test</h1>
+    
+    <div class="test">
+        <h3>Test 1: Simple Server (Port 5001)</h3>
+        <button onclick="testSimpleServer()">Test Simple Server</button>
+        <div id="simple-result"></div>
+    </div>
+    
+    <div class="test">
+        <h3>Test 2: Main Server (Port 5000)</h3>
+        <button onclick="testMainServer()">Test Main Server</button>
+        <div id="main-result"></div>
+    </div>
+    
+    <div class="test">
+        <h3>Test 3: Direct URLs</h3>
+        <p>Try clicking these links directly:</p>
+        <a href="http://localhost:5001/test" target="_blank">Simple Server Test</a><br>
+        <a href="http://localhost:5000/api/health" target="_blank">Main Server Health</a>
+    </div>
+
+    <script>
+        async function testSimpleServer() {
+            const resultDiv = document.getElementById('simple-result');
+            try {
+                const response = await fetch('http://localhost:5001/test');
+                const data = await response.json();
+                resultDiv.className = 'success';
+                resultDiv.innerHTML = `✅ Simple server works!<br><pre>${JSON.stringify(data, null, 2)}</pre>`;
+            } catch (error) {
+                resultDiv.className = 'error';
+                resultDiv.innerHTML = `❌ Simple server failed: ${error.message}`;
+            }
+        }
+
+        async function testMainServer() {
+            const resultDiv = document.getElementById('main-result');
+            try {
+                const response = await fetch('http://localhost:5000/api/health');
+                const data = await response.json();
+                resultDiv.className = 'success';
+                resultDiv.innerHTML = `✅ Main server works!<br><pre>${JSON.stringify(data, null, 2)}</pre>`;
+            } catch (error) {
+                resultDiv.className = 'error';
+                resultDiv.innerHTML = `❌ Main server failed: ${error.message}`;
+            }
+        }
+    </script>
+</body>
+</html>

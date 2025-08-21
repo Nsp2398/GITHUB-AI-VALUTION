@@ -5,6 +5,7 @@ Clean, optimized version with proper file handling
 """
 from flask import Flask, request, jsonify, send_file, Response
 from flask_cors import CORS
+from werkzeug.utils import secure_filename
 import sqlite3
 import hashlib
 import jwt
@@ -12,7 +13,6 @@ from datetime import datetime, timedelta
 import os
 import zipfile
 import io
-import hashlib
 
 # Optional imports with fallbacks
 try:
@@ -31,11 +31,27 @@ try:
 except ImportError:
     DOCX_AVAILABLE = False
 
+except ImportError:
+    DOCX_AVAILABLE = False
+
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'valuai-secret-key-2024'
 
+# JWT Configuration - NEVER EXPIRES (FOR TESTING ONLY)
+app.config['JWT_ACCESS_TOKEN_EXPIRES'] = False
+
+# Optimize Flask for better performance
+app.config['JSON_SORT_KEYS'] = False
+app.config['JSONIFY_PRETTYPRINT_REGULAR'] = False
+
 # Simple CORS configuration - allow all origins for development
-CORS(app)
+CORS(app, resources={
+    r"/api/*": {
+        "origins": ["http://127.0.0.1:5173", "http://localhost:5173"],
+        "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+        "allow_headers": ["Content-Type", "Authorization"]
+    }
+})
 
 def hash_file_content(content: bytes) -> str:
     """Generate MD5 hash of file content for integrity checking"""
@@ -96,13 +112,29 @@ def create_safe_filename(company_name: str, format_ext: str) -> str:
     return f"{safe_name}_valuation_report_{timestamp}.{format_ext}"
 
 def get_db_connection():
-    """Get database connection"""
-    conn = sqlite3.connect('valuai.db')
+    """Get database connection with connection pooling"""
+    conn = sqlite3.connect('valuai.db', check_same_thread=False)
     conn.row_factory = sqlite3.Row
+    # Enable WAL mode for better performance
+    conn.execute('PRAGMA journal_mode=WAL')
     return conn
 
 def init_db():
-    """Initialize database with users table"""
+    """Initialize database with users table - optimized for faster startup"""
+    # Skip initialization if database already exists and has data
+    if os.path.exists('valuai.db'):
+        try:
+            conn = get_db_connection()
+            cursor = conn.cursor()
+            # Quick check if users table exists and has the default user
+            cursor.execute('SELECT COUNT(*) FROM users WHERE email = ?', ('nsp6575@gmail.com',))
+            user_exists = cursor.fetchone()[0] > 0
+            conn.close()
+            if user_exists:
+                return  # Skip initialization if user already exists
+        except:
+            pass  # If any error, continue with full initialization
+    
     conn = get_db_connection()
     cursor = conn.cursor()
     
@@ -133,11 +165,11 @@ def verify_password(password, password_hash):
     return hashlib.sha256(password.encode()).hexdigest() == password_hash
 
 def generate_token(user_id, email):
-    """Generate JWT token"""
+    """Generate JWT token - NEVER EXPIRES (FOR TESTING ONLY)"""
     payload = {
         'user_id': user_id,
-        'email': email,
-        'exp': datetime.utcnow() + timedelta(hours=24)
+        'email': email
+        # 'exp' removed - token never expires
     }
     return jwt.encode(payload, app.config['SECRET_KEY'], algorithm='HS256')
 
@@ -1187,25 +1219,375 @@ def upload_financial_data():
             'message': 'Failed to process financial data'
         }), 500
 
+# ============================================
+# VALUATION ENDPOINTS (Multi-Model Valuation)
+# ============================================
+
+class ValuationModels:
+    """Multi-model valuation calculator supporting various startup and business valuation methods"""
+    
+    @staticmethod
+    def berkus_method(data):
+        """Berkus Method: Pre-revenue qualitative valuation"""
+        factors = {
+            'sound_idea': data.get('idea_quality', 0.5),
+            'prototype_quality': data.get('product_quality', 0.7),
+            'quality_management': data.get('team_experience', 0.8),
+            'strategic_relationships': data.get('partnerships', 0.6),
+            'product_rollout': data.get('market_readiness', 0.5)
+        }
+        
+        total_score = sum(factors.values()) / len(factors)
+        valuation = total_score * 2000000  # $2M max total
+        
+        return {
+            'valuation': int(valuation),
+            'factors': factors,
+            'method': 'berkus',
+            'confidence': min(95, max(60, total_score * 100))
+        }
+    
+    @staticmethod
+    def scorecard_method(data):
+        """Scorecard Method: Compare against regional startup averages"""
+        regional_average = data.get('regional_average', 2000000)
+        
+        # Scorecard factors with weights
+        factors = {
+            'management': {'weight': 0.30, 'score': data.get('team_score', 100)},
+            'size_of_opportunity': {'weight': 0.25, 'score': data.get('market_size_score', 100)},
+            'product_technology': {'weight': 0.15, 'score': data.get('product_score', 100)},
+            'competitive_environment': {'weight': 0.10, 'score': data.get('competitive_score', 100)},
+            'marketing_channels': {'weight': 0.10, 'score': data.get('marketing_score', 100)},
+            'need_for_funding': {'weight': 0.05, 'score': data.get('funding_score', 100)},
+            'other': {'weight': 0.05, 'score': data.get('other_score', 100)}
+        }
+        
+        weighted_score = sum(f['weight'] * (f['score'] / 100) for f in factors.values())
+        valuation = regional_average * weighted_score
+        
+        return {
+            'valuation': int(valuation),
+            'factors': factors,
+            'regional_average': regional_average,
+            'weighted_score': weighted_score,
+            'method': 'scorecard'
+        }
+
+    @staticmethod 
+    def risk_factor_summation(data):
+        """Risk Factor Summation Method"""
+        base_valuation = data.get('base_valuation', 2000000)
+        
+        risk_factors = {
+            'management_risk': data.get('management_risk', 0),
+            'stage_of_business': data.get('stage_risk', 0),
+            'legislation_risk': data.get('political_risk', 0),
+            'manufacturing_risk': data.get('production_risk', 0),
+            'sales_marketing_risk': data.get('sales_risk', 0),
+            'funding_capital_risk': data.get('funding_risk', 0),
+            'competition_risk': data.get('competition_risk', 0),
+            'technology_risk': data.get('technology_risk', 0),
+            'litigation_risk': data.get('litigation_risk', 0),
+            'international_risk': data.get('international_risk', 0),
+            'reputation_risk': data.get('reputation_risk', 0),
+            'potential_lucrative_exit': data.get('exit_potential', 0)
+        }
+        
+        total_adjustment = sum(risk_factors.values())
+        adjusted_valuation = base_valuation + (base_valuation * total_adjustment)
+        
+        return {
+            'valuation': max(0, int(adjusted_valuation)),
+            'base_valuation': base_valuation,
+            'risk_factors': risk_factors,
+            'total_adjustment': total_adjustment,
+            'method': 'risk_factor_summation'
+        }
+
+    @staticmethod
+    def vc_method(data):
+        """Venture Capital Method"""
+        expected_exit_value = data.get('expected_exit_value', 50000000)
+        years_to_exit = data.get('years_to_exit', 5)
+        target_return = data.get('target_return', 0.10)  # 10x return
+        retention_ratio = data.get('retention_ratio', 0.8)
+        
+        terminal_value = expected_exit_value
+        required_return = (1 + target_return) ** years_to_exit
+        post_money_valuation = terminal_value / required_return
+        
+        # Calculate ownership percentage needed
+        investment_needed = data.get('investment_needed', 1000000)
+        ownership_needed = investment_needed / post_money_valuation
+        
+        # Adjust for dilution
+        final_ownership = ownership_needed / retention_ratio
+        pre_money_valuation = post_money_valuation - investment_needed
+        
+        return {
+            'valuation': max(0, int(pre_money_valuation)),
+            'post_money_valuation': int(post_money_valuation),
+            'terminal_value': terminal_value,
+            'required_return': required_return,
+            'ownership_percentage': final_ownership * 100,
+            'method': 'vc_method'
+        }
+
+    @staticmethod
+    def dcf_method(data):
+        """Discounted Cash Flow Method"""
+        try:
+            # Financial projections
+            current_revenue = data.get('current_revenue', 1000000)
+            growth_rate = data.get('growth_rate', 0.20)
+            ebitda_margin = data.get('ebitda_margin', 0.25)
+            tax_rate = data.get('tax_rate', 0.25)
+            discount_rate = data.get('discount_rate', 0.12)
+            terminal_growth = data.get('terminal_growth', 0.03)
+            projection_years = data.get('projection_years', 5)
+            
+            cash_flows = []
+            
+            # Project cash flows
+            for year in range(1, projection_years + 1):
+                revenue = current_revenue * ((1 + growth_rate) ** year)
+                ebitda = revenue * ebitda_margin
+                # Simplified cash flow calculation
+                free_cash_flow = ebitda * (1 - tax_rate)
+                present_value = free_cash_flow / ((1 + discount_rate) ** year)
+                
+                cash_flows.append({
+                    'year': year,
+                    'revenue': revenue,
+                    'ebitda': ebitda,
+                    'free_cash_flow': free_cash_flow,
+                    'present_value': present_value
+                })
+            
+            # Terminal value
+            terminal_fcf = cash_flows[-1]['free_cash_flow'] * (1 + terminal_growth)
+            terminal_value = terminal_fcf / (discount_rate - terminal_growth)
+            terminal_pv = terminal_value / ((1 + discount_rate) ** projection_years)
+            
+            # Enterprise value
+            pv_of_cash_flows = sum(cf['present_value'] for cf in cash_flows)
+            enterprise_value = pv_of_cash_flows + terminal_pv
+            
+            return {
+                'valuation': int(enterprise_value),
+                'cash_flows': cash_flows,
+                'terminal_value': terminal_value,
+                'terminal_pv': terminal_pv,
+                'pv_of_cash_flows': pv_of_cash_flows,
+                'method': 'dcf'
+            }
+            
+        except Exception as e:
+            return {
+                'valuation': 0,
+                'error': str(e),
+                'method': 'dcf'
+            }
+
+    @staticmethod
+    def market_comparables(data):
+        """Market Comparables Method"""
+        # Get comparable companies data
+        comparables = data.get('comparables', [])
+        company_metrics = data.get('company_metrics', {})
+        
+        if not comparables:
+            # Use default market multiples if no comparables provided
+            revenue_multiple = data.get('revenue_multiple', 3.0)
+            ebitda_multiple = data.get('ebitda_multiple', 8.0)
+            
+            company_revenue = company_metrics.get('revenue', 1000000)
+            company_ebitda = company_metrics.get('ebitda', 250000)
+            
+            revenue_valuation = company_revenue * revenue_multiple
+            ebitda_valuation = company_ebitda * ebitda_multiple
+            
+            # Weighted average
+            valuation = (revenue_valuation * 0.6) + (ebitda_valuation * 0.4)
+            
+            return {
+                'valuation': int(valuation),
+                'revenue_valuation': revenue_valuation,
+                'ebitda_valuation': ebitda_valuation,
+                'multiples_used': {
+                    'revenue_multiple': revenue_multiple,
+                    'ebitda_multiple': ebitda_multiple
+                },
+                'method': 'market_comparables'
+            }
+        
+        # Calculate multiples from comparables
+        total_rev_multiple = 0
+        total_ebitda_multiple = 0
+        valid_comparables = 0
+        
+        for comp in comparables:
+            if comp.get('valuation') and comp.get('revenue'):
+                rev_multiple = comp['valuation'] / comp['revenue']
+                total_rev_multiple += rev_multiple
+                valid_comparables += 1
+                
+                if comp.get('ebitda'):
+                    ebitda_multiple = comp['valuation'] / comp['ebitda']
+                    total_ebitda_multiple += ebitda_multiple
+        
+        if valid_comparables > 0:
+            avg_rev_multiple = total_rev_multiple / valid_comparables
+            avg_ebitda_multiple = total_ebitda_multiple / valid_comparables if total_ebitda_multiple > 0 else 8.0
+            
+            company_revenue = company_metrics.get('revenue', 1000000)
+            company_ebitda = company_metrics.get('ebitda', 250000)
+            
+            revenue_valuation = company_revenue * avg_rev_multiple
+            ebitda_valuation = company_ebitda * avg_ebitda_multiple
+            
+            valuation = (revenue_valuation * 0.6) + (ebitda_valuation * 0.4)
+            
+            return {
+                'valuation': int(valuation),
+                'revenue_valuation': revenue_valuation,
+                'ebitda_valuation': ebitda_valuation,
+                'comparables_used': len(comparables),
+                'multiples_calculated': {
+                    'avg_revenue_multiple': avg_rev_multiple,
+                    'avg_ebitda_multiple': avg_ebitda_multiple
+                },
+                'method': 'market_comparables'
+            }
+        
+        return {
+            'valuation': 0,
+            'error': 'Insufficient comparable data',
+            'method': 'market_comparables'
+        }
+
+@app.route('/api/valuate/all-methods', methods=['POST'])
+def valuate_all_methods():
+    """Run all valuation methods and return comprehensive results"""
+    try:
+        data = request.get_json()
+        if not data:
+            return jsonify({'error': 'No data provided'}), 400
+        
+        # Initialize ValuationModels
+        models = ValuationModels()
+        
+        # Run all valuation methods
+        results = {
+            'berkus': models.berkus_method(data),
+            'scorecard': models.scorecard_method(data),
+            'risk_factor': models.risk_factor_summation(data),
+            'vc_method': models.vc_method(data),
+            'dcf': models.dcf_method(data),
+            'market_comparables': models.market_comparables(data)
+        }
+        
+        # Calculate summary statistics
+        valuations = [result.get('valuation', 0) for result in results.values() if result.get('valuation', 0) > 0]
+        
+        if valuations:
+            summary = {
+                'average_valuation': sum(valuations) / len(valuations),
+                'median_valuation': sorted(valuations)[len(valuations)//2],
+                'min_valuation': min(valuations),
+                'max_valuation': max(valuations),
+                'methods_count': len(valuations)
+            }
+        else:
+            summary = {
+                'average_valuation': 0,
+                'median_valuation': 0,
+                'min_valuation': 0,
+                'max_valuation': 0,
+                'methods_count': 0
+            }
+        
+        return jsonify({
+            'success': True,
+            'results': results,
+            'summary': summary,
+            'timestamp': datetime.now().isoformat()
+        })
+        
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+@app.route('/api/methods', methods=['GET'])
+def get_available_methods():
+    """Get list of available valuation methods"""
+    methods = [
+        {
+            'id': 'berkus',
+            'name': 'Berkus Method',
+            'description': 'Pre-revenue qualitative valuation based on 5 key factors',
+            'suitable_for': 'Pre-revenue startups',
+            'max_valuation': 2000000
+        },
+        {
+            'id': 'scorecard',
+            'name': 'Scorecard Method',
+            'description': 'Compare against regional averages using weighted factors',
+            'suitable_for': 'Early-stage startups',
+            'max_valuation': None
+        },
+        {
+            'id': 'risk_factor',
+            'name': 'Risk Factor Summation',
+            'description': 'Adjust base valuation based on risk assessment',
+            'suitable_for': 'Startups with identifiable risks',
+            'max_valuation': None
+        },
+        {
+            'id': 'vc_method',
+            'name': 'Venture Capital Method',
+            'description': 'Calculate pre-money valuation based on expected exit',
+            'suitable_for': 'Venture-backed startups',
+            'max_valuation': None
+        },
+        {
+            'id': 'dcf',
+            'name': 'Discounted Cash Flow',
+            'description': 'Present value of projected future cash flows',
+            'suitable_for': 'Revenue-generating businesses',
+            'max_valuation': None
+        },
+        {
+            'id': 'market_comparables',
+            'name': 'Market Comparables',
+            'description': 'Valuation based on similar company multiples',
+            'suitable_for': 'Companies with comparable peers',
+            'max_valuation': None
+        }
+    ]
+    
+    return jsonify({
+        'success': True,
+        'methods': methods,
+        'total_methods': len(methods)
+    })
+
 if __name__ == '__main__':
     print("🚀 Starting ValuAI Business Valuation Tool...")
-    print("📊 Initializing database...")
+    
+    # Quick database initialization
     init_db()
     print("✅ Server ready!")
-    print("🔧 API Base URL: http://127.0.0.1:5000")
-    print("📁 Available endpoints:")
-    print("   - GET  /api/health")
-    print("   - POST /api/auth/signin")
-    print("   - POST /api/generate-comprehensive-report")
-    print("   - POST /api/reports/generate-direct")
-    print("   - GET  /api/reports/download/<filename>")
-    print("   - GET  /api/reports/list")
-    print("   - POST /api/files/upload")
-    print("   - POST /api/files/upload-batch")
-    print("   - POST /api/upload-financial-data")
-    print("   - GET  /api/files/list")
     
-    # Use port 5002 since 5000 appears to be blocked
-    print("⚠️  Note: Using port 5002 due to port 5000 being blocked")
-    print("🌐 Update frontend proxy to: http://127.0.0.1:5002")
-    app.run(host='127.0.0.1', port=5002, debug=True)
+    # Minimal startup info for faster boot
+    print("🔧 Running on: http://127.0.0.1:5002")
+    print("� Status: http://127.0.0.1:5002/api/health")
+    
+    # Use production mode for faster startup (set debug=False)
+    # Enable debug mode only if FLASK_DEBUG environment variable is set
+    debug_mode = os.environ.get('FLASK_DEBUG', 'false').lower() == 'true'
+    
+    app.run(host='127.0.0.1', port=5002, debug=debug_mode, threaded=True)

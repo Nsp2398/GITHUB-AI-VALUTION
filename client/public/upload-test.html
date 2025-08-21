@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Upload Test</title>
+</head>
+<body>
+    <h1>File Upload Test</h1>
+    <input type="file" id="fileInput" accept=".csv,.xlsx,.xls,.txt">
+    <button onclick="testUpload()">Test Upload</button>
+    <div id="result"></div>
+
+    <script>
+        async function testUpload() {
+            const fileInput = document.getElementById('fileInput');
+            const resultDiv = document.getElementById('result');
+            
+            if (!fileInput.files.length) {
+                resultDiv.innerHTML = '<p style="color: red;">Please select a file first</p>';
+                return;
+            }
+            
+            try {
+                resultDiv.innerHTML = '<p>Testing upload...</p>';
+                
+                // Step 1: Authentication
+                const authResponse = await fetch('/api/auth/signin', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        email: 'nsp6575@gmail.com',
+                        password: 'Newpassword123'
+                    })
+                });
+                
+                if (!authResponse.ok) {
+                    throw new Error(`Auth failed: ${authResponse.status}`);
+                }
+                
+                const authData = await authResponse.json();
+                const token = authData.token;
+                
+                resultDiv.innerHTML += '<p style="color: green;">✅ Authentication successful</p>';
+                
+                // Step 2: File upload
+                const formData = new FormData();
+                formData.append('file', fileInput.files[0]);
+                
+                const uploadResponse = await fetch('/api/upload-financial-data', {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: formData
+                });
+                
+                if (uploadResponse.ok) {
+                    const uploadData = await uploadResponse.json();
+                    resultDiv.innerHTML += '<p style="color: green;">✅ Upload successful!</p>';
+                    resultDiv.innerHTML += `<pre>${JSON.stringify(uploadData, null, 2)}</pre>`;
+                } else {
+                    const errorText = await uploadResponse.text();
+                    resultDiv.innerHTML += `<p style="color: red;">❌ Upload failed: ${uploadResponse.status}</p>`;
+                    resultDiv.innerHTML += `<p style="color: red;">Error: ${errorText}</p>`;
+                }
+                
+            } catch (error) {
+                resultDiv.innerHTML += `<p style="color: red;">❌ Error: ${error.message}</p>`;
+            }
+        }
+    </script>
+</body>
+</html>

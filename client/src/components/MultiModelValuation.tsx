@@ -299,7 +299,7 @@ const MultiModelValuation: React.FC<ValuationAnalysisProps> = ({ companyData }) 
       traction: companyData.traction
     };
 
-    fetch('http://localhost:5000/api/valuate/all-methods', {
+    fetch('/api/valuate/all-methods', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

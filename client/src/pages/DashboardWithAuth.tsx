@@ -82,7 +82,7 @@ export const Dashboard: React.FC = () => {
         format: format
       };
 
-      const response = await fetch('http://localhost:5000/api/generate-comprehensive-report', {
+      const response = await fetch('/api/generate-comprehensive-report', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

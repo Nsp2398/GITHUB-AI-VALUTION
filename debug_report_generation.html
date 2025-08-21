@@ -1,0 +1,361 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ValuAI Debug - Report Generation Test</title>
+    <style>
+        body { 
+            font-family: Arial, sans-serif; 
+            margin: 20px; 
+            background: #f5f5f5; 
+        }
+        .container { 
+            max-width: 800px; 
+            margin: 0 auto; 
+            background: white; 
+            padding: 20px; 
+            border-radius: 8px; 
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1); 
+        }
+        .section { 
+            margin: 20px 0; 
+            padding: 15px; 
+            border: 1px solid #ddd; 
+            border-radius: 5px; 
+        }
+        .success { 
+            background-color: #d4edda; 
+            border-color: #c3e6cb; 
+            color: #155724; 
+        }
+        .error { 
+            background-color: #f8d7da; 
+            border-color: #f5c6cb; 
+            color: #721c24; 
+        }
+        .warning { 
+            background-color: #fff3cd; 
+            border-color: #ffeaa7; 
+            color: #856404; 
+        }
+        button { 
+            margin: 5px; 
+            padding: 10px 15px; 
+            border: none; 
+            border-radius: 4px; 
+            cursor: pointer; 
+            font-size: 14px; 
+        }
+        .btn-primary { background: #007bff; color: white; }
+        .btn-success { background: #28a745; color: white; }
+        .btn-warning { background: #ffc107; color: black; }
+        .btn-danger { background: #dc3545; color: white; }
+        .status { 
+            display: inline-block; 
+            padding: 2px 8px; 
+            border-radius: 12px; 
+            font-size: 12px; 
+            font-weight: bold; 
+        }
+        .status.online { background: #28a745; color: white; }
+        .status.offline { background: #dc3545; color: white; }
+        #log { 
+            background: #1e1e1e; 
+            color: #00ff00; 
+            padding: 10px; 
+            border-radius: 4px; 
+            height: 200px; 
+            overflow-y: auto; 
+            font-family: 'Courier New', monospace; 
+            font-size: 12px; 
+        }
+        .input-group { 
+            margin: 10px 0; 
+        }
+        .input-group label { 
+            display: block; 
+            margin-bottom: 5px; 
+            font-weight: bold; 
+        }
+        .input-group input, .input-group select { 
+            width: 100%; 
+            padding: 8px; 
+            border: 1px solid #ddd; 
+            border-radius: 4px; 
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🧪 ValuAI Debug & Test Panel</h1>
+        <p>Backend: <span id="backend-url">http://localhost:5000</span> <span id="backend-status" class="status offline">OFFLINE</span></p>
+        <p>Frontend: <span id="frontend-url">http://localhost:5173</span> <span id="frontend-status" class="status online">ONLINE</span></p>
+
+        <div class="section">
+            <h3>🔍 Connection Tests</h3>
+            <button class="btn-primary" onclick="testHealth()">🏥 Test Health</button>
+            <button class="btn-primary" onclick="testCORS()">🌐 Test CORS</button>
+            <button class="btn-warning" onclick="testAll()">🔄 Test All</button>
+            <div id="connection-result"></div>
+        </div>
+
+        <div class="section">
+            <h3>🔑 Authentication Test</h3>
+            <div class="input-group">
+                <label>Email:</label>
+                <input type="email" id="email" value="nsp6575@gmail.com">
+            </div>
+            <div class="input-group">
+                <label>Password:</label>
+                <input type="password" id="password" value="Newpassword123">
+            </div>
+            <button class="btn-success" onclick="testLogin()">🔐 Test Login</button>
+            <div id="auth-result"></div>
+        </div>
+
+        <div class="section">
+            <h3>📊 Report Generation Test</h3>
+            <div class="input-group">
+                <label>Company Name:</label>
+                <input type="text" id="companyName" value="Test UCaaS Company">
+            </div>
+            <div class="input-group">
+                <label>Revenue ($):</label>
+                <input type="number" id="revenue" value="5000000">
+            </div>
+            <div class="input-group">
+                <label>Growth Rate (%):</label>
+                <input type="number" id="growthRate" value="25" step="0.1">
+            </div>
+            <button class="btn-success" onclick="generateReport()">📈 Generate Report</button>
+            <button class="btn-warning" onclick="downloadReport()">📥 Download ZIP</button>
+            <div id="report-result"></div>
+        </div>
+
+        <div class="section">
+            <h3>📋 Activity Log</h3>
+            <button class="btn-danger" onclick="clearLog()">🗑️ Clear Log</button>
+            <div id="log"></div>
+        </div>
+    </div>
+
+    <script>
+        let authToken = '';
+        const API_BASE = 'http://localhost:5000';
+        
+        function log(message, type = 'info') {
+            const logDiv = document.getElementById('log');
+            const timestamp = new Date().toLocaleTimeString();
+            const colors = {
+                info: '#00ff00',
+                error: '#ff4444',
+                success: '#44ff44',
+                warning: '#ffaa00'
+            };
+            
+            logDiv.innerHTML += `<div style="color: ${colors[type]}">[${timestamp}] ${message}</div>`;
+            logDiv.scrollTop = logDiv.scrollHeight;
+        }
+
+        function clearLog() {
+            document.getElementById('log').innerHTML = '';
+        }
+
+        function updateStatus(elementId, isOnline) {
+            const element = document.getElementById(elementId);
+            element.className = `status ${isOnline ? 'online' : 'offline'}`;
+            element.textContent = isOnline ? 'ONLINE' : 'OFFLINE';
+        }
+
+        async function testHealth() {
+            log('Testing backend health...', 'info');
+            try {
+                const response = await fetch(`${API_BASE}/api/health`, {
+                    method: 'GET',
+                    headers: {
+                        'Accept': 'application/json'
+                    }
+                });
+
+                if (response.ok) {
+                    const data = await response.json();
+                    log(`✅ Health check successful: ${JSON.stringify(data)}`, 'success');
+                    updateStatus('backend-status', true);
+                    document.getElementById('connection-result').innerHTML = 
+                        `<div class="success">✅ Backend is healthy!</div>`;
+                } else {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+            } catch (error) {
+                log(`❌ Health check failed: ${error.message}`, 'error');
+                updateStatus('backend-status', false);
+                document.getElementById('connection-result').innerHTML = 
+                    `<div class="error">❌ Backend health check failed: ${error.message}</div>`;
+            }
+        }
+
+        async function testCORS() {
+            log('Testing CORS configuration...', 'info');
+            try {
+                const response = await fetch(`${API_BASE}/api/health`, {
+                    method: 'OPTIONS',
+                    headers: {
+                        'Origin': window.location.origin,
+                        'Access-Control-Request-Method': 'GET'
+                    }
+                });
+
+                log(`✅ CORS test completed. Status: ${response.status}`, 'success');
+                document.getElementById('connection-result').innerHTML = 
+                    `<div class="success">✅ CORS is properly configured!</div>`;
+            } catch (error) {
+                log(`❌ CORS test failed: ${error.message}`, 'error');
+                document.getElementById('connection-result').innerHTML = 
+                    `<div class="error">❌ CORS test failed: ${error.message}</div>`;
+            }
+        }
+
+        async function testLogin() {
+            const email = document.getElementById('email').value;
+            const password = document.getElementById('password').value;
+            
+            log(`Testing login for ${email}...`, 'info');
+            
+            try {
+                const response = await fetch(`${API_BASE}/api/auth/signin`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json'
+                    },
+                    body: JSON.stringify({ email, password })
+                });
+
+                const data = await response.json();
+                
+                if (response.ok) {
+                    authToken = data.token;
+                    log(`✅ Login successful! Token: ${authToken.substring(0, 20)}...`, 'success');
+                    document.getElementById('auth-result').innerHTML = 
+                        `<div class="success">✅ Login successful! User: ${data.user.email}</div>`;
+                } else {
+                    throw new Error(data.error || `HTTP ${response.status}`);
+                }
+            } catch (error) {
+                log(`❌ Login failed: ${error.message}`, 'error');
+                document.getElementById('auth-result').innerHTML = 
+                    `<div class="error">❌ Login failed: ${error.message}</div>`;
+            }
+        }
+
+        async function generateReport() {
+            if (!authToken) {
+                alert('Please login first!');
+                return;
+            }
+
+            const companyName = document.getElementById('companyName').value;
+            const revenue = parseInt(document.getElementById('revenue').value);
+            const growthRate = parseFloat(document.getElementById('growthRate').value) / 100;
+
+            log(`Generating report for ${companyName}...`, 'info');
+
+            try {
+                const response = await fetch(`${API_BASE}/api/generate-comprehensive-report`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${authToken}`,
+                        'Accept': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        company_name: companyName,
+                        revenue: revenue,
+                        growth_rate: growthRate,
+                        market_cap: revenue * 5,
+                        ebitda: revenue * 0.3,
+                        profit_margin: 0.15,
+                        mrr: revenue / 12,
+                        arpu: 500,
+                        churn_rate: 0.05,
+                        cac: 1000,
+                        ltv: 10000
+                    })
+                });
+
+                const data = await response.json();
+                
+                if (response.ok) {
+                    log(`✅ Report generated successfully!`, 'success');
+                    document.getElementById('report-result').innerHTML = 
+                        `<div class="success">✅ Report generated! ${data.message}</div>`;
+                } else {
+                    throw new Error(data.error || `HTTP ${response.status}`);
+                }
+            } catch (error) {
+                log(`❌ Report generation failed: ${error.message}`, 'error');
+                document.getElementById('report-result').innerHTML = 
+                    `<div class="error">❌ Report generation failed: ${error.message}</div>`;
+            }
+        }
+
+        async function downloadReport() {
+            if (!authToken) {
+                alert('Please login first!');
+                return;
+            }
+
+            log('Downloading report ZIP...', 'info');
+
+            try {
+                const response = await fetch(`${API_BASE}/api/reports/download-zip`, {
+                    method: 'GET',
+                    headers: {
+                        'Authorization': `Bearer ${authToken}`
+                    }
+                });
+
+                if (response.ok) {
+                    const blob = await response.blob();
+                    const url = window.URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = 'valuai-reports.zip';
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                    window.URL.revokeObjectURL(url);
+                    
+                    log(`✅ Download started successfully!`, 'success');
+                    document.getElementById('report-result').innerHTML = 
+                        `<div class="success">✅ Download started! Check your downloads folder.</div>`;
+                } else {
+                    const data = await response.json();
+                    throw new Error(data.error || `HTTP ${response.status}`);
+                }
+            } catch (error) {
+                log(`❌ Download failed: ${error.message}`, 'error');
+                document.getElementById('report-result').innerHTML = 
+                    `<div class="error">❌ Download failed: ${error.message}</div>`;
+            }
+        }
+
+        async function testAll() {
+            log('Running all tests...', 'info');
+            await testHealth();
+            await new Promise(resolve => setTimeout(resolve, 1000));
+            await testCORS();
+            await new Promise(resolve => setTimeout(resolve, 1000));
+            await testLogin();
+            log('All tests completed!', 'success');
+        }
+
+        // Auto-test on page load
+        window.onload = function() {
+            log('ValuAI Debug Panel loaded', 'info');
+            testHealth();
+        };
+    </script>
+</body>
+</html>

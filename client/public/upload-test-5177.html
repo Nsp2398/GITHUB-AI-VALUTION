@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Upload Diagnostics - Port 5177</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; background: #f5f5f5; }
+        .container { max-width: 1200px; margin: 0 auto; background: white; padding: 20px; border-radius: 8px; }
+        .test-section { margin: 20px 0; padding: 20px; border: 1px solid #ddd; border-radius: 5px; background: #fafafa; }
+        .success { color: #28a745; }
+        .error { color: #dc3545; }
+        .warning { color: #ffc107; }
+        button { padding: 10px 20px; margin: 10px 5px; cursor: pointer; background: #007bff; color: white; border: none; border-radius: 4px; }
+        button:hover { background: #0056b3; }
+        input[type="file"] { margin: 10px 0; padding: 5px; }
+        input[type="email"], input[type="password"] { margin: 5px; padding: 8px; width: 200px; border: 1px solid #ddd; border-radius: 4px; }
+        pre { background: #f8f9fa; padding: 15px; border-radius: 4px; overflow-x: auto; border: 1px solid #e9ecef; }
+        .status-indicator { display: inline-block; width: 12px; height: 12px; border-radius: 50%; margin-right: 8px; }
+        .status-online { background: #28a745; }
+        .status-offline { background: #dc3545; }
+        .step { margin: 10px 0; padding: 10px; background: white; border-left: 4px solid #007bff; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔧 Upload Diagnostics Dashboard</h1>
+        <p>Frontend: <strong>http://localhost:5177</strong> | Backend: <strong>http://localhost:5000</strong></p>
+        
+        <div class="test-section">
+            <h2><span class="status-indicator" id="server-status"></span>1. Server Status</h2>
+            <button onclick="checkServerHealth()">Check Server Health</button>
+            <div id="health-result"></div>
+        </div>
+
+        <div class="test-section">
+            <h2><span class="status-indicator" id="auth-status"></span>2. Authentication Test</h2>
+            <div class="step">
+                <strong>Step 1:</strong> Login to get token<br>
+                <input type="email" id="email" placeholder="Email" value="nsp6575@gmail.com">
+                <input type="password" id="password" placeholder="Password" value="test123">
+                <button onclick="testLogin()">Login</button>
+            </div>
+            <div id="auth-result"></div>
+        </div>
+
+        <div class="test-section">
+            <h2><span class="status-indicator" id="upload-status"></span>3. File Upload Test</h2>
+            <div class="step">
+                <strong>Step 2:</strong> Upload file with token<br>
+                <input type="file" id="fileInput" multiple>
+                <button onclick="testFileUpload()">Upload File</button>
+                <button onclick="testFileUploadWithoutAuth()">Upload Without Auth (Should Fail)</button>
+            </div>
+            <div id="upload-result"></div>
+        </div>
+
+        <div class="test-section">
+            <h2>4. CORS Test</h2>
+            <button onclick="testCORS()">Test CORS Preflight</button>
+            <div id="cors-result"></div>
+        </div>
+
+        <div class="test-section">
+            <h2>5. Network Diagnostics</h2>
+            <button onclick="testNetwork()">Run Network Tests</button>
+            <div id="network-result"></div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = 'http://localhost:5000/api';
+        let authToken = localStorage.getItem('token');
+
+        function updateStatus(elementId, isOnline) {
+            const element = document.getElementById(elementId);
+            element.className = `status-indicator ${isOnline ? 'status-online' : 'status-offline'}`;
+        }
+
+        function displayResult(elementId, content, isSuccess = null) {
+            const element = document.getElementById(elementId);
+            let className = '';
+            if (isSuccess === true) className = 'success';
+            else if (isSuccess === false) className = 'error';
+            else className = 'warning';
+            
+            element.innerHTML = `<div class="${className}">${content}</div>`;
+        }
+
+        async function checkServerHealth() {
+            try {
+                const response = await fetch(`${API_BASE}/health`);
+                const data = await response.json();
+                
+                if (response.ok) {
+                    updateStatus('server-status', true);
+                    displayResult('health-result', `
+                        ✅ Server is healthy!<br>
+                        Status: ${data.status}<br>
+                        Time: ${data.timestamp}<br>
+                        <pre>${JSON.stringify(data, null, 2)}</pre>
+                    `, true);
+                } else {
+                    updateStatus('server-status', false);
+                    displayResult('health-result', `❌ Server responded with error: ${response.status}`, false);
+                }
+            } catch (error) {
+                updateStatus('server-status', false);
+                displayResult('health-result', `❌ Cannot connect to server: ${error.message}`, false);
+            }
+        }
+
+        async function testLogin() {
+            const email = document.getElementById('email').value;
+            const password = document.getElementById('password').value;
+
+            try {
+                const response = await fetch(`${API_BASE}/auth/signin`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ email, password })
+                });
+
+                const data = await response.json();
+                
+                if (response.ok && data.token) {
+                    authToken = data.token;
+                    localStorage.setItem('token', authToken);
+                    updateStatus('auth-status', true);
+                    displayResult('auth-result', `
+                        ✅ Login successful!<br>
+                        Token: ${authToken.substring(0, 20)}...<br>
+                        <pre>${JSON.stringify(data, null, 2)}</pre>
+                    `, true);
+                } else {
+                    updateStatus('auth-status', false);
+                    displayResult('auth-result', `❌ Login failed: <pre>${JSON.stringify(data, null, 2)}</pre>`, false);
+                }
+            } catch (error) {
+                updateStatus('auth-status', false);
+                displayResult('auth-result', `❌ Login error: ${error.message}`, false);
+            }
+        }
+
+        async function testFileUpload() {
+            const fileInput = document.getElementById('fileInput');
+            
+            if (!fileInput.files.length) {
+                displayResult('upload-result', '❌ Please select a file first', false);
+                return;
+            }
+
+            if (!authToken) {
+                displayResult('upload-result', '❌ Please login first to get authentication token', false);
+                return;
+            }
+
+            try {
+                const formData = new FormData();
+                formData.append('file', fileInput.files[0]);
+
+                const response = await fetch(`${API_BASE}/files/upload`, {
+                    method: 'POST',
+                    body: formData,
+                    headers: {
+                        'Authorization': `Bearer ${authToken}`
+                    }
+                });
+
+                const data = await response.json();
+                
+                if (response.ok) {
+                    updateStatus('upload-status', true);
+                    displayResult('upload-result', `
+                        ✅ Upload successful!<br>
+                        File: ${data.filename}<br>
+                        Size: ${data.size} bytes<br>
+                        <pre>${JSON.stringify(data, null, 2)}</pre>
+                    `, true);
+                } else {
+                    updateStatus('upload-status', false);
+                    displayResult('upload-result', `❌ Upload failed (${response.status}): <pre>${JSON.stringify(data, null, 2)}</pre>`, false);
+                }
+            } catch (error) {
+                updateStatus('upload-status', false);
+                displayResult('upload-result', `❌ Upload error: ${error.message}`, false);
+            }
+        }
+
+        async function testFileUploadWithoutAuth() {
+            const fileInput = document.getElementById('fileInput');
+            
+            if (!fileInput.files.length) {
+                displayResult('upload-result', '❌ Please select a file first', false);
+                return;
+            }
+
+            try {
+                const formData = new FormData();
+                formData.append('file', fileInput.files[0]);
+
+                const response = await fetch(`${API_BASE}/files/upload`, {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const data = await response.json();
+                
+                if (response.status === 401) {
+                    displayResult('upload-result', `
+                        ✅ Expected authentication error (this is correct behavior):<br>
+                        <pre>${JSON.stringify(data, null, 2)}</pre>
+                    `, true);
+                } else {
+                    displayResult('upload-result', `⚠️ Unexpected response: <pre>${JSON.stringify(data, null, 2)}</pre>`, null);
+                }
+            } catch (error) {
+                displayResult('upload-result', `❌ Upload error: ${error.message}`, false);
+            }
+        }
+
+        async function testCORS() {
+            try {
+                const response = await fetch(`${API_BASE}/files/upload`, {
+                    method: 'OPTIONS',
+                    headers: {
+                        'Origin': 'http://localhost:5177',
+                        'Access-Control-Request-Method': 'POST',
+                        'Access-Control-Request-Headers': 'Content-Type,Authorization'
+                    }
+                });
+
+                const headers = {};
+                for (let [key, value] of response.headers.entries()) {
+                    headers[key] = value;
+                }
+
+                displayResult('cors-result', `
+                    ✅ CORS preflight response (${response.status}):<br>
+                    <pre>${JSON.stringify(headers, null, 2)}</pre>
+                `, response.ok);
+            } catch (error) {
+                displayResult('cors-result', `❌ CORS error: ${error.message}`, false);
+            }
+        }
+
+        async function testNetwork() {
+            const tests = [
+                { name: 'Health Check', url: `${API_BASE}/health` },
+                { name: 'Auth Endpoint', url: `${API_BASE}/auth/signin`, method: 'OPTIONS' },
+                { name: 'Upload Endpoint', url: `${API_BASE}/files/upload`, method: 'OPTIONS' }
+            ];
+
+            let results = [];
+            
+            for (let test of tests) {
+                try {
+                    const response = await fetch(test.url, { method: test.method || 'GET' });
+                    results.push(`✅ ${test.name}: ${response.status}`);
+                } catch (error) {
+                    results.push(`❌ ${test.name}: ${error.message}`);
+                }
+            }
+
+            displayResult('network-result', results.join('<br>'), null);
+        }
+
+        // Auto-run health check on page load
+        window.onload = function() {
+            checkServerHealth();
+            
+            // Check if we have a stored token
+            if (authToken) {
+                updateStatus('auth-status', true);
+                displayResult('auth-result', `✅ Found stored token: ${authToken.substring(0, 20)}...`, true);
+            }
+        };
+    </script>
+</body>
+</html>

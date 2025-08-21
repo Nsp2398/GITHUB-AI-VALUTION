@@ -73,8 +73,8 @@ def signup():
         db.commit()
         db.refresh(user)
         
-        # Generate token using Flask-JWT-Extended
-        token = create_access_token(identity=user.id, expires_delta=datetime.timedelta(hours=24))
+        # Generate token using Flask-JWT-Extended - NEVER EXPIRES (FOR TESTING ONLY)
+        token = create_access_token(identity=user.id, expires_delta=False)
         
         return jsonify({
             'token': token,
@@ -137,8 +137,8 @@ def signin():
         user.last_login = datetime.datetime.utcnow()
         db.commit()
         
-        # Generate token using Flask-JWT-Extended
-        token = create_access_token(identity=user.id, expires_delta=datetime.timedelta(hours=24))
+        # Generate token using Flask-JWT-Extended - NEVER EXPIRES (FOR TESTING ONLY)
+        token = create_access_token(identity=user.id, expires_delta=False)
         
         return jsonify({
             'token': token,
@@ -291,8 +291,8 @@ def reset_password():
         print(f"📧 Email: {user.email}")
         print(f"🕒 Reset time: {datetime.datetime.utcnow()}")
         
-        # Generate new login token
-        login_token = create_access_token(identity=user.id, expires_delta=datetime.timedelta(hours=24))
+        # Generate new login token - NEVER EXPIRES (FOR TESTING ONLY)
+        login_token = create_access_token(identity=user.id, expires_delta=False)
         
         return jsonify({
             'message': 'Password reset successful',

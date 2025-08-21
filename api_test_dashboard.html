@@ -1,0 +1,416 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>ValuAI API Test Dashboard</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; background-color: #f5f5f5; }
+        .container { max-width: 1200px; margin: 0 auto; }
+        .test-section { margin: 20px 0; padding: 15px; border: 1px solid #ccc; border-radius: 8px; background: white; }
+        .success { background-color: #d4edda; border-color: #c3e6cb; }
+        .error { background-color: #f8d7da; border-color: #f5c6cb; }
+        .warning { background-color: #fff3cd; border-color: #ffeaa7; }
+        button { padding: 10px 15px; margin: 5px; background: #007bff; color: white; border: none; border-radius: 5px; cursor: pointer; font-size: 14px; }
+        button:hover { background: #0056b3; }
+        button:disabled { background: #6c757d; cursor: not-allowed; }
+        pre { background: #f8f9fa; padding: 10px; border-radius: 5px; overflow-x: auto; font-size: 12px; }
+        .status-indicator { display: inline-block; width: 12px; height: 12px; border-radius: 50%; margin-right: 8px; }
+        .status-online { background-color: #28a745; }
+        .status-offline { background-color: #dc3545; }
+        .header { text-align: center; margin-bottom: 30px; }
+        .server-info { background: #e9ecef; padding: 15px; border-radius: 8px; margin-bottom: 20px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🧪 ValuAI API Testing Dashboard</h1>
+            <p>Comprehensive RESTful API Testing for Port 5002</p>
+        </div>
+        
+        <div class="server-info">
+            <h3><span class="status-indicator" id="server-status"></span>Server Status</h3>
+            <p><strong>URL:</strong> <span id="server-url">http://127.0.0.1:5002</span></p>
+            <p><strong>Last Check:</strong> <span id="last-check">Never</span></p>
+            <button onclick="checkServerStatus()">Check Server Status</button>
+        </div>
+        
+        <div class="test-section">
+            <h3>🩺 1. Health Check</h3>
+            <p>Test basic server connectivity and health endpoint</p>
+            <button onclick="testHealth()">Test Health Endpoint</button>
+            <div id="health-result"></div>
+        </div>
+        
+        <div class="test-section">
+            <h3>🔐 2. Authentication</h3>
+            <p>Test user login and JWT token generation</p>
+            <button onclick="testAuth()">Test Login</button>
+            <div id="auth-result"></div>
+        </div>
+        
+        <div class="test-section">
+            <h3>📁 3. File Operations</h3>
+            <p>Test file upload and processing capabilities</p>
+            <input type="file" id="file-input" accept=".txt,.csv,.pdf,.docx" style="margin: 10px 0;">
+            <br>
+            <button onclick="testFileUpload()">Test Single File Upload</button>
+            <button onclick="testBatchUpload()">Test Batch Upload</button>
+            <button onclick="testFileList()">List Files</button>
+            <div id="upload-result"></div>
+        </div>
+        
+        <div class="test-section">
+            <h3>💰 4. Valuation Endpoints</h3>
+            <p>Test business valuation and financial data processing</p>
+            <button onclick="testFinancialData()">Test Financial Data Upload</button>
+            <button onclick="testReportGeneration()">Test Report Generation</button>
+            <div id="valuation-result"></div>
+        </div>
+        
+        <div class="test-section">
+            <h3>📊 5. Report Management</h3>
+            <p>Test report listing and download capabilities</p>
+            <button onclick="testReportList()">List Reports</button>
+            <div id="report-result"></div>
+        </div>
+        
+        <div class="test-section">
+            <h3>🚀 6. Complete Test Suite</h3>
+            <p>Run all tests in sequence</p>
+            <button onclick="runAllTests()" id="run-all-btn">Run Complete Test Suite</button>
+            <div id="all-results"></div>
+        </div>
+    </div>
+
+    <script>
+        const SERVER_URL = 'http://127.0.0.1:5002';
+        let authToken = null;
+        let testResults = [];
+
+        function displayResult(elementId, success, data, title = '') {
+            const element = document.getElementById(elementId);
+            const status = success ? 'success' : 'error';
+            const icon = success ? '✅' : '❌';
+            
+            element.className = 'test-section ' + status;
+            element.innerHTML = `
+                <strong>${icon} ${title || (success ? 'SUCCESS' : 'FAILED')}</strong>
+                <pre>${JSON.stringify(data, null, 2)}</pre>
+            `;
+        }
+
+        async function checkServerStatus() {
+            const statusIndicator = document.getElementById('server-status');
+            const lastCheck = document.getElementById('last-check');
+            
+            try {
+                const start = Date.now();
+                const response = await fetch(`${SERVER_URL}/api/health`, { timeout: 5000 });
+                const elapsed = Date.now() - start;
+                
+                if (response.ok) {
+                    statusIndicator.className = 'status-indicator status-online';
+                    lastCheck.textContent = `${new Date().toLocaleTimeString()} (${elapsed}ms)`;
+                } else {
+                    statusIndicator.className = 'status-indicator status-offline';
+                    lastCheck.textContent = `${new Date().toLocaleTimeString()} (Error: ${response.status})`;
+                }
+            } catch (error) {
+                statusIndicator.className = 'status-indicator status-offline';
+                lastCheck.textContent = `${new Date().toLocaleTimeString()} (${error.message})`;
+            }
+        }
+
+        async function testHealth() {
+            try {
+                const response = await fetch(`${SERVER_URL}/api/health`);
+                const data = await response.json();
+                displayResult('health-result', response.ok, {
+                    status: response.status,
+                    response_time: `${Date.now()}ms`,
+                    data: data
+                }, 'Health Check');
+                return response.ok;
+            } catch (error) {
+                displayResult('health-result', false, {
+                    error: error.message,
+                    details: 'Server may not be running or accessible'
+                }, 'Health Check');
+                return false;
+            }
+        }
+
+        async function testAuth() {
+            try {
+                const response = await fetch(`${SERVER_URL}/api/auth/signin`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        email: 'nsp6575@gmail.com',
+                        password: 'Newpassword123'
+                    })
+                });
+                const data = await response.json();
+                
+                if (response.ok && data.token) {
+                    authToken = data.token;
+                }
+                
+                displayResult('auth-result', response.ok, {
+                    status: response.status,
+                    has_token: !!data.token,
+                    token_preview: data.token ? data.token.substring(0, 50) + '...' : null,
+                    data: data
+                }, 'Authentication');
+                return response.ok;
+            } catch (error) {
+                displayResult('auth-result', false, {
+                    error: error.message
+                }, 'Authentication');
+                return false;
+            }
+        }
+
+        async function testFileUpload() {
+            try {
+                const testContent = 'Test Financial Data\nRevenue: $5,000,000\nGrowth Rate: 25%\nEBITDA: $1,000,000';
+                const file = new Blob([testContent], { type: 'text/plain' });
+                
+                const formData = new FormData();
+                formData.append('file', file, 'test-financial-data.txt');
+
+                const headers = {};
+                if (authToken) {
+                    headers['Authorization'] = `Bearer ${authToken}`;
+                }
+
+                const response = await fetch(`${SERVER_URL}/api/files/upload`, {
+                    method: 'POST',
+                    headers: headers,
+                    body: formData
+                });
+                
+                const data = await response.json();
+                displayResult('upload-result', response.ok, {
+                    status: response.status,
+                    data: data
+                }, 'File Upload');
+                return response.ok;
+            } catch (error) {
+                displayResult('upload-result', false, {
+                    error: error.message
+                }, 'File Upload');
+                return false;
+            }
+        }
+
+        async function testBatchUpload() {
+            try {
+                const files = [
+                    new Blob(['Financial Data 1\nRevenue: $1M'], { type: 'text/plain' }),
+                    new Blob(['Financial Data 2\nRevenue: $2M'], { type: 'text/plain' })
+                ];
+                
+                const formData = new FormData();
+                formData.append('files', files[0], 'finance1.txt');
+                formData.append('files', files[1], 'finance2.txt');
+
+                const response = await fetch(`${SERVER_URL}/api/files/upload-batch`, {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                const data = await response.json();
+                displayResult('upload-result', response.ok, {
+                    status: response.status,
+                    data: data
+                }, 'Batch Upload');
+                return response.ok;
+            } catch (error) {
+                displayResult('upload-result', false, {
+                    error: error.message
+                }, 'Batch Upload');
+                return false;
+            }
+        }
+
+        async function testFileList() {
+            try {
+                const response = await fetch(`${SERVER_URL}/api/files/list`);
+                const data = await response.json();
+                displayResult('upload-result', response.ok, {
+                    status: response.status,
+                    data: data
+                }, 'File List');
+                return response.ok;
+            } catch (error) {
+                displayResult('upload-result', false, {
+                    error: error.message
+                }, 'File List');
+                return false;
+            }
+        }
+
+        async function testFinancialData() {
+            try {
+                const financialData = {
+                    company_name: 'Test Company Ltd',
+                    revenue: 5000000,
+                    growth_rate: 25,
+                    gross_margin: 78,
+                    ebitda_margin: 20,
+                    churn_rate: 5,
+                    cac: 500,
+                    ltv: 5000,
+                    customers: 1000,
+                    mrr: 400000
+                };
+
+                const response = await fetch(`${SERVER_URL}/api/upload-financial-data`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(financialData)
+                });
+                
+                const data = await response.json();
+                displayResult('valuation-result', response.ok, {
+                    status: response.status,
+                    data: data
+                }, 'Financial Data Upload');
+                return response.ok;
+            } catch (error) {
+                displayResult('valuation-result', false, {
+                    error: error.message
+                }, 'Financial Data Upload');
+                return false;
+            }
+        }
+
+        async function testReportGeneration() {
+            try {
+                const reportData = {
+                    companyName: 'Test Company Ltd',
+                    industry: 'Technology',
+                    revenue: 5000000,
+                    growth_rate: 0.25,
+                    ebitda_margin: 0.20,
+                    discount_rate: 0.12,
+                    format: 'pdf'
+                };
+
+                const response = await fetch(`${SERVER_URL}/api/generate-comprehensive-report`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(reportData)
+                });
+                
+                let data;
+                const contentType = response.headers.get('content-type');
+                if (contentType && contentType.includes('application/json')) {
+                    data = await response.json();
+                } else {
+                    data = { 
+                        content_type: contentType,
+                        size: response.headers.get('content-length') || 'unknown'
+                    };
+                }
+                
+                displayResult('valuation-result', response.ok, {
+                    status: response.status,
+                    content_type: contentType,
+                    data: data
+                }, 'Report Generation');
+                return response.ok;
+            } catch (error) {
+                displayResult('valuation-result', false, {
+                    error: error.message
+                }, 'Report Generation');
+                return false;
+            }
+        }
+
+        async function testReportList() {
+            try {
+                const response = await fetch(`${SERVER_URL}/api/reports/list`);
+                const data = await response.json();
+                displayResult('report-result', response.ok, {
+                    status: response.status,
+                    data: data
+                }, 'Report List');
+                return response.ok;
+            } catch (error) {
+                displayResult('report-result', false, {
+                    error: error.message
+                }, 'Report List');
+                return false;
+            }
+        }
+
+        async function runAllTests() {
+            const button = document.getElementById('run-all-btn');
+            const allResultsDiv = document.getElementById('all-results');
+            
+            button.disabled = true;
+            button.textContent = '⏳ Running Tests...';
+            
+            allResultsDiv.innerHTML = '<p>⏳ Running comprehensive test suite...</p>';
+            
+            const tests = [
+                { name: 'Health Check', func: testHealth },
+                { name: 'Authentication', func: testAuth },
+                { name: 'File Upload', func: testFileUpload },
+                { name: 'Financial Data', func: testFinancialData },
+                { name: 'Report Generation', func: testReportGeneration },
+                { name: 'Report List', func: testReportList }
+            ];
+            
+            let passed = 0;
+            const results = [];
+            
+            for (const test of tests) {
+                try {
+                    const success = await test.func();
+                    if (success) {
+                        passed++;
+                        results.push(`✅ ${test.name}: PASSED`);
+                    } else {
+                        results.push(`❌ ${test.name}: FAILED`);
+                    }
+                } catch (error) {
+                    results.push(`💥 ${test.name}: CRASHED - ${error.message}`);
+                }
+                
+                // Brief pause between tests
+                await new Promise(resolve => setTimeout(resolve, 1000));
+            }
+            
+            const success = passed === tests.length;
+            allResultsDiv.className = 'test-section ' + (success ? 'success' : 'error');
+            allResultsDiv.innerHTML = `
+                <h4>📊 Final Test Results: ${passed}/${tests.length} tests passed</h4>
+                <pre>${results.join('\n')}</pre>
+                ${success ? 
+                    '<p><strong>🎉 ALL RESTFUL APIs ARE WORKING CORRECTLY!</strong></p><p>✅ Your ValuAI server is fully operational on port 5002</p>' : 
+                    '<p><strong>⚠️ Some tests failed. Check individual test results above for details.</strong></p>'
+                }
+                <hr>
+                <h4>🔧 Next Steps:</h4>
+                <ul>
+                    <li>✅ Backend server is running on <strong>http://127.0.0.1:5002</strong></li>
+                    <li>🔧 Update frontend proxy to use port <strong>5002</strong> instead of 5000</li>
+                    <li>🌐 Test frontend at <strong>http://localhost:5173</strong></li>
+                </ul>
+            `;
+            
+            button.disabled = false;
+            button.textContent = 'Run Complete Test Suite';
+        }
+
+        // Auto-check server status on page load
+        window.onload = function() {
+            checkServerStatus();
+            setTimeout(testHealth, 1000);
+        };
+    </script>
+</body>
+</html>
