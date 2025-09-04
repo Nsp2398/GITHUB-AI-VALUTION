@@ -240,6 +240,144 @@ const AuthForm = ({ onAuthSuccess }: { onAuthSuccess: (authData: any) => void })
 
 // File Upload Component
 const FileUploadSection = () => {
+  // 🚀 Comprehensive 2025 Industry categorization configuration
+  const industryCategories = {
+    retail: {
+      name: 'Retail',
+      subIndustries: {
+        gas_station: 'Gas Station',
+        grocery_store: 'Grocery Store', 
+        liquor_store: 'Liquor Store',
+        clothing_store: 'Clothing Store',
+        pharmacy: 'Pharmacy',
+        convenience_store: 'Convenience Store',
+        restaurant: 'Restaurant',
+        coffee_shop: 'Coffee Shop',
+        luxury_retail: 'Luxury Retail',
+        ecommerce_marketplace: 'E-commerce Marketplace'
+      }
+    },
+    technology: {
+      name: 'Technology',
+      subIndustries: {
+        saas_enterprise: 'SaaS/Enterprise Software',
+        ai_ml_platform: 'AI/ML Platform',
+        cybersecurity: 'Cybersecurity',
+        fintech_payments: 'FinTech/Payments',
+        ucaas: 'UCaaS/Communications',
+        ecommerce: 'E-commerce Platform',
+        mobile_apps: 'Mobile Apps',
+        healthtech: 'HealthTech'
+      }
+    },
+    healthcare_life_sciences: {
+      name: 'Healthcare & Life Sciences',
+      subIndustries: {
+        digital_health_platform: 'Digital Health Platform',
+        biotech_drug_development: 'Biotech/Drug Development',
+        medical_devices: 'Medical Devices',
+        telemedicine: 'Telemedicine',
+        clinic: 'Medical Clinic',
+        dental: 'Dental Practice',
+        veterinary: 'Veterinary Clinic',
+        mental_health: 'Mental Health Services',
+        physical_therapy: 'Physical Therapy',
+        home_healthcare: 'Home Healthcare'
+      }
+    },
+    financial_services: {
+      name: 'Financial Services',
+      subIndustries: {
+        wealth_management: 'Wealth Management',
+        insurance_technology: 'Insurance Technology',
+        robo_advisory: 'Robo-Advisory',
+        banking_services: 'Banking Services',
+        payment_processing: 'Payment Processing',
+        lending_platform: 'Lending Platform',
+        investment_management: 'Investment Management',
+        financial_advisory: 'Financial Advisory'
+      }
+    },
+    real_estate_proptech: {
+      name: 'Real Estate & PropTech',
+      subIndustries: {
+        property_management_saas: 'Property Management SaaS',
+        real_estate_marketplace: 'Real Estate Marketplace',
+        commercial_real_estate: 'Commercial Real Estate',
+        residential_development: 'Residential Development',
+        real_estate_investment: 'Real Estate Investment',
+        construction_tech: 'Construction Technology'
+      }
+    },
+    energy_utilities: {
+      name: 'Energy & Utilities',
+      subIndustries: {
+        renewable_energy_developer: 'Renewable Energy Developer',
+        energy_storage: 'Energy Storage',
+        solar_development: 'Solar Development',
+        wind_energy: 'Wind Energy',
+        energy_efficiency: 'Energy Efficiency',
+        grid_technology: 'Grid Technology',
+        carbon_management: 'Carbon Management'
+      }
+    },
+    education_training: {
+      name: 'Education & Training',
+      subIndustries: {
+        edtech_platform: 'EdTech Platform',
+        corporate_training: 'Corporate Training',
+        online_education: 'Online Education',
+        skill_development: 'Skill Development',
+        certification_programs: 'Certification Programs',
+        language_learning: 'Language Learning'
+      }
+    },
+    logistics_transport: {
+      name: 'Logistics & Transportation',
+      subIndustries: {
+        last_mile_delivery: 'Last Mile Delivery',
+        freight_technology: 'Freight Technology',
+        supply_chain_management: 'Supply Chain Management',
+        warehouse_automation: 'Warehouse Automation',
+        logistics_platform: 'Logistics Platform',
+        transportation_services: 'Transportation Services'
+      }
+    },
+    professional_services: {
+      name: 'Professional Services',
+      subIndustries: {
+        consulting: 'Consulting',
+        accounting: 'Accounting',
+        legal: 'Legal Services',
+        marketing: 'Marketing Agency',
+        architecture: 'Architecture',
+        engineering: 'Engineering',
+        design_services: 'Design Services',
+        business_services: 'Business Services'
+      }
+    },
+    manufacturing: {
+      name: 'Manufacturing',
+      subIndustries: {
+        advanced_manufacturing: 'Advanced Manufacturing',
+        pharmaceutical_manufacturing: 'Pharmaceutical Manufacturing',
+        automotive: 'Automotive',
+        food_beverage: 'Food & Beverage',
+        electronics: 'Electronics',
+        textiles: 'Textiles',
+        chemicals: 'Chemicals',
+        machinery: 'Machinery',
+        packaging: 'Packaging',
+        metal_fabrication: 'Metal Fabrication'
+      }
+    }
+  };
+
+  // Get sub-industries for selected industry
+  const getSubIndustries = (industry: string) => {
+    return industryCategories[industry as keyof typeof industryCategories]?.subIndustries || {};
+  };
+
   const [files, setFiles] = useState<File[]>([]);
   const [uploading, setUploading] = useState(false);
   const [uploadComplete, setUploadComplete] = useState(false);
@@ -249,7 +387,8 @@ const FileUploadSection = () => {
     revenue: '',
     growthRate: '',
     expenses: '',
-    industry: 'UCaaS',
+    industry: 'retail',
+    subIndustry: 'gas_station',
     employees: '',
     marketShare: '',
     customerCount: '',
@@ -434,6 +573,41 @@ const FileUploadSection = () => {
                   placeholder="Your Company Ltd."
                   required
                 />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Industry Type *</label>
+                <select
+                  value={manualData.industry}
+                  onChange={(e) => {
+                    const newIndustry = e.target.value;
+                    const subIndustries = getSubIndustries(newIndustry);
+                    const firstSubIndustry = Object.keys(subIndustries)[0] || '';
+                    setManualData({ 
+                      ...manualData, 
+                      industry: newIndustry,
+                      subIndustry: firstSubIndustry
+                    });
+                  }}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                  required
+                >
+                  {Object.entries(industryCategories).map(([key, category]) => (
+                    <option key={key} value={key}>{category.name}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Sub-Industry *</label>
+                <select
+                  value={manualData.subIndustry}
+                  onChange={(e) => setManualData({ ...manualData, subIndustry: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                  required
+                >
+                  {Object.entries(getSubIndustries(manualData.industry)).map(([key, name]) => (
+                    <option key={key} value={key}>{name}</option>
+                  ))}
+                </select>
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Annual Revenue ($) *</label>
